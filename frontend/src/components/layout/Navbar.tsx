@@ -11,8 +11,27 @@ export default function Navbar() {
   const [isSearching, setIsSearching] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem('jwtToken');
+    if (token) {
+      setIsLoggedIn(true);
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUsername(payload.sub);
+      } catch (e) {
+        console.error("Failed to parse JWT", e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -44,6 +63,44 @@ export default function Navbar() {
     setSearchQuery("");
     setSearchResults([]);
     navigate(`/media/${mediaType || 'movie'}/${movieId}`);
+  };
+
+  const handleAuth = async () => {
+    setAuthError("");
+    if (!authUsername || !authPassword) {
+      setAuthError("Username and password are required");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const response = await fetch(`http://localhost:8080${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: authUsername, password: authPassword })
+      });
+      
+      if (!response.ok) {
+        const errData = await response.text();
+        // If it's a JSON response with an error, parse it, otherwise use text
+        try {
+            const parsed = JSON.parse(errData);
+            throw new Error(parsed.message || parsed.error || 'Authentication failed');
+        } catch {
+            throw new Error(errData || 'Authentication failed');
+        }
+      }
+      
+      const data = await response.json();
+      localStorage.setItem('jwtToken', data.token);
+      setIsAuthModalOpen(false);
+      window.location.href = '/dashboard';
+    } catch (err: any) {
+      setAuthError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -108,12 +165,21 @@ export default function Navbar() {
             )}
           </div>
           
-          <button 
-            onClick={() => setIsAuthModalOpen(true)}
-            className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
-          >
-            <User className="w-5 h-5 text-foreground" />
-          </button>
+          {isLoggedIn ? (
+            <Link 
+              to="/dashboard"
+              className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold hover:bg-primary/80 transition-colors"
+            >
+              {username ? username.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
+            </Link>
+          ) : (
+            <button 
+              onClick={() => setIsAuthModalOpen(true)}
+              className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+            >
+              <User className="w-5 h-5 text-foreground" />
+            </button>
+          )}
         </div>
 
       </div>
@@ -149,10 +215,12 @@ export default function Navbar() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">Email</label>
+                  <label className="text-xs font-semibold uppercase text-muted-foreground mb-1 block">Username</label>
                   <input 
-                    type="email" 
-                    placeholder="name@example.com"
+                    type="text" 
+                    placeholder="cinephile99"
+                    value={authUsername}
+                    onChange={(e) => setAuthUsername(e.target.value)}
                     className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -161,12 +229,20 @@ export default function Navbar() {
                   <input 
                     type="password" 
                     placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
                     className="w-full bg-secondary/50 border border-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
                 
-                <button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-lg transition-colors mt-2">
-                  {authMode === 'login' ? 'Sign In' : 'Sign Up'}
+                {authError && <p className="text-red-500 text-sm mt-2 font-medium">{authError}</p>}
+                
+                <button 
+                  onClick={handleAuth}
+                  disabled={isLoading}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-lg transition-colors mt-2 disabled:opacity-50"
+                >
+                  {isLoading ? 'Processing...' : (authMode === 'login' ? 'Sign In' : 'Sign Up')}
                 </button>
               </div>
 
@@ -179,7 +255,10 @@ export default function Navbar() {
                 </div>
               </div>
 
-              <button className="w-full bg-white hover:bg-gray-100 text-black font-medium py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
+              <a 
+                href="http://localhost:8080/oauth2/authorization/google"
+                className="w-full bg-white hover:bg-gray-100 text-black font-medium py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
+              >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                   <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -187,7 +266,7 @@ export default function Navbar() {
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
                 <span>Google</span>
-              </button>
+              </a>
 
               <div className="mt-6 text-center text-sm text-muted-foreground">
                 {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
