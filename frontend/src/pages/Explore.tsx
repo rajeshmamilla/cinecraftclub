@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, TrendingUp, RefreshCw } from 'lucide-react';
 import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../services/tmdb';
+import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 
 export default function Explore() {
@@ -60,26 +61,7 @@ export default function Explore() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {movies.map((movie, idx) => (
-          <div 
-            key={`${movie.id}-${idx}`} 
-            onClick={() => navigate(`/media/${movie.media_type || 'movie'}/${movie.id}`)}
-            className="group relative rounded-lg overflow-hidden poster-hover cursor-pointer shadow-lg bg-secondary"
-          >
-            <div className="aspect-[2/3] w-full relative">
-              <img 
-                src={getImageUrl(movie.poster_path)} 
-                alt={movie.title || movie.name}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-                <h3 className="font-semibold text-white text-sm line-clamp-2 mb-1">{movie.title || movie.name}</h3>
-                <div className="flex items-center space-x-1 text-yellow-400">
-                  <Star className="w-4 h-4 fill-current" />
-                  <span className="text-xs font-medium">{movie.vote_average?.toFixed(1)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <MovieCard key={`${movie.id}-${idx}`} movie={movie} />
         ))}
       </div>
 

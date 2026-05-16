@@ -59,6 +59,44 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const handleOpenAuth = () => setIsAuthModalOpen(true);
+    window.addEventListener('open-auth-modal', handleOpenAuth);
+    return () => window.removeEventListener('open-auth-modal', handleOpenAuth);
+  }, []);
+
+  const executePendingAction = async (token: string) => {
+    try {
+      const pendingActionStr = localStorage.getItem('pendingAction');
+      if (pendingActionStr) {
+        const action = JSON.parse(pendingActionStr);
+        if (action.type === 'ADD_WATCHLIST' && action.movie) {
+          const movie = action.movie;
+          await fetch('http://localhost:8080/api/watchlist', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({
+              movieId: movie.id,
+              mediaType: movie.media_type || 'movie',
+              title: movie.title || movie.name,
+              posterPath: movie.poster_path,
+              overview: movie.overview,
+              voteAverage: movie.vote_average,
+              releaseDate: movie.release_date || movie.first_air_date
+            })
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to execute pending action", e);
+    } finally {
+      localStorage.removeItem('pendingAction');
+    }
+  };
+
   const handleResultClick = (movieId: number, mediaType?: 'movie' | 'tv') => {
     setSearchQuery("");
     setSearchResults([]);
@@ -94,6 +132,7 @@ export default function Navbar() {
       
       const data = await response.json();
       localStorage.setItem('jwtToken', data.token);
+      await executePendingAction(data.token);
       setIsAuthModalOpen(false);
       window.location.href = '/dashboard';
     } catch (err: any) {

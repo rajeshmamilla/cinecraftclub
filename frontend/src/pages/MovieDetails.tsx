@@ -1,16 +1,23 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Star, MessageSquare, Clock, Calendar, Users, User, Bookmark, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Star, MessageSquare, Clock, Calendar, Users, User, ChevronLeft, ChevronRight, Plus, LogIn, CheckCircle, Check, Film, Bookmark } from 'lucide-react';
 import { getMediaDetails, getImageUrl } from '../services/tmdb';
 import type { MovieDetails as MovieDetailsType } from '../services/tmdb';
 
-const MOCK_GROUPS = [
-  { id: 1, title: "Ending Explained & Theories", members: 342, tags: ["Spoilers", "Story"] },
-  { id: 2, title: "Cinematography Appreciation", members: 156, tags: ["Camera Work", "Lighting"] },
-];
+interface GroupResponse {
+  id: number;
+  name: string;
+  focus: string;
+  keywords: string;
+  description: string;
+  memberCount: number;
+  isMember: boolean;
+  createdBy: string;
+}
 
 export default function MovieDetails() {
   const { type, id } = useParams<{ type: string; id: string }>();
+  const navigate = useNavigate();
   const [movie, setMovie] = useState<MovieDetailsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
@@ -19,7 +26,17 @@ export default function MovieDetails() {
   const [isReviewPanelOpen, setIsReviewPanelOpen] = useState(true);
   const [reviewText, setReviewText] = useState("");
 
-  // Hide review panel when scrolling down
+  // Groups state
+  const [groups, setGroups] = useState<GroupResponse[]>([]);
+  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [groupsLoading, setGroupsLoading] = useState(true);
+
+  // Watchlist state
+  const [inWatchlist, setInWatchlist] = useState(false);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
+
+  const token = localStorage.getItem('jwtToken');
+
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 150 && isReviewPanelOpen) {
@@ -42,6 +59,102 @@ export default function MovieDetails() {
     fetchDetails();
   }, [id, type]);
 
+  // Fetch real groups for this movie (include auth token so isMember is accurate)
+  useEffect(() => {
+    if (!id) return;
+    const fetchGroups = async () => {
+      setGroupsLoading(true);
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`http://localhost:8080/api/groups/movie/${id}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setGroups(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch groups", e);
+      } finally {
+        setGroupsLoading(false);
+      }
+    };
+    fetchGroups();
+  }, [id, token]);
+
+  // Fetch watchlist status
+  useEffect(() => {
+    if (!id || !token) { setWatchlistLoading(false); return; }
+    const check = async () => {
+      try {
+        const res = await fetch(`http://localhost:8080/api/watchlist/check/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) setInWatchlist(await res.json());
+      } catch (e) { console.error(e); }
+      finally { setWatchlistLoading(false); }
+    };
+    check();
+  }, [id, token]);
+
+  const toggleWatchlist = async () => {
+    if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
+    const prev = inWatchlist;
+    setInWatchlist(!prev);
+    try {
+      if (prev) {
+        await fetch(`http://localhost:8080/api/watchlist/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } else {
+        await fetch('http://localhost:8080/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({
+            movieId: Number(id),
+            mediaType: type || 'movie',
+            title: movie?.title || movie?.name,
+            posterPath: movie?.poster_path,
+            overview: movie?.overview,
+            voteAverage: movie?.vote_average,
+            releaseDate: movie?.release_date || movie?.first_air_date
+          })
+        });
+      }
+    } catch (e) { setInWatchlist(prev); }
+  };
+
+  const handleJoinGroup = async (groupId: number) => {
+    if (!token) {
+      navigate('/'); // Redirect to auth
+      return;
+    }
+    setJoiningGroupId(groupId);
+    try {
+      const res = await fetch(`http://localhost:8080/api/groups/${groupId}/join`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        // Update group in list with fresh data
+        setGroups(prev => prev.map(g => g.id === groupId ? { ...g, isMember: true, memberCount: updated.memberCount } : g));
+      }
+    } catch (e) {
+      console.error("Failed to join group", e);
+    } finally {
+      setJoiningGroupId(null);
+    }
+  };
+
+  const handleOpenGroup = (groupId: number) => {
+    if (!token) {
+      navigate('/');
+      return;
+    }
+    navigate(`/group/${groupId}`);
+  };
+
   const handleRatingSubmit = () => {
     if (userRating > 0) {
       setShowToast(true);
@@ -57,14 +170,13 @@ export default function MovieDetails() {
     return <div className="min-h-screen flex items-center justify-center"><h2 className="text-2xl">Movie not found</h2></div>;
   }
 
-  // Filter important crew (Directors, Writers, Music)
   const importantCrewRoles = ['Director', 'Screenplay', 'Writer', 'Original Music Composer'];
   const keyCrew = movie.credits?.crew?.filter(c => importantCrewRoles.includes(c.job)).slice(0, 8) || [];
   const mainCast = movie.credits?.cast?.slice(0, 10) || [];
 
   return (
     <div className="w-full pb-16 relative">
-      
+
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-4 right-4 bg-primary text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2 animate-in slide-in-from-bottom-5">
@@ -74,11 +186,10 @@ export default function MovieDetails() {
       )}
 
       {/* Slide-out Review Panel */}
-      <div 
+      <div
         className={`fixed top-1/4 right-0 z-50 transition-transform duration-500 flex ${isReviewPanelOpen ? 'translate-x-0' : 'translate-x-[400px]'}`}
       >
-        {/* Toggle Button */}
-        <button 
+        <button
           onClick={() => setIsReviewPanelOpen(!isReviewPanelOpen)}
           className={`absolute ${isReviewPanelOpen ? '-left-10' : '-left-[92px]'} top-1/2 -translate-y-1/2 bg-secondary/90 backdrop-blur border border-r-0 border-border py-3 px-2 rounded-l-xl shadow-2xl hover:bg-secondary transition-all duration-300 flex items-center group cursor-pointer`}
         >
@@ -94,10 +205,9 @@ export default function MovieDetails() {
           )}
         </button>
 
-        {/* Panel Content */}
         <div className="w-[400px] bg-background/95 backdrop-blur-xl border border-border shadow-2xl rounded-l-2xl p-8 flex flex-col h-[550px]">
           <h3 className="text-2xl font-bold mb-6">Rating area</h3>
-          
+
           <div className="flex justify-between items-center mb-8">
             <div className="flex">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
@@ -108,12 +218,8 @@ export default function MovieDetails() {
                   onClick={() => setUserRating(star)}
                   className="p-1 focus:outline-none transition-transform hover:scale-125"
                 >
-                  <Star 
-                    className={`w-5 h-5 transition-colors ${
-                      (hoveredRating || userRating) >= star 
-                        ? 'text-yellow-400 fill-current' 
-                        : 'text-muted-foreground'
-                    }`} 
+                  <Star
+                    className={`w-5 h-5 transition-colors ${(hoveredRating || userRating) >= star ? 'text-yellow-400 fill-current' : 'text-muted-foreground'}`}
                   />
                 </button>
               ))}
@@ -122,14 +228,14 @@ export default function MovieDetails() {
           </div>
 
           <h4 className="text-sm font-semibold mb-2">Your Experience</h4>
-          <textarea 
+          <textarea
             placeholder="Write your review here..."
             value={reviewText}
             onChange={(e) => setReviewText(e.target.value)}
             className="flex-1 w-full bg-secondary/50 border border-border rounded-lg p-3 text-sm focus:outline-none focus:border-primary transition-colors resize-none mb-4"
           />
 
-          <button 
+          <button
             onClick={handleRatingSubmit}
             disabled={userRating === 0 || reviewText.length === 0}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -141,42 +247,50 @@ export default function MovieDetails() {
 
       {/* Hero Section */}
       <section className="relative w-full">
-        {/* Backdrop */}
         <div className="absolute inset-0 h-[60vh] md:h-[80vh] w-full z-0">
-          <img 
+          <img
             src={getImageUrl(movie.backdrop_path, 'original')}
             alt="Hero Backdrop"
             className="w-full h-full object-cover opacity-30"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
         </div>
-        
+
         <div className="container mx-auto px-4 relative z-10 pt-[20vh] md:pt-[30vh]">
           <div className="flex flex-col md:flex-row md:space-x-8 items-end md:items-start">
-            
-            {/* Poster */}
+
             <div className="w-48 md:w-72 shrink-0 rounded-lg overflow-hidden shadow-2xl border-2 border-border/50 -mt-24 md:mt-0 z-20">
-              <img 
+              <img
                 src={getImageUrl(movie.poster_path)}
                 alt={movie.title}
                 className="w-full h-auto object-cover"
               />
             </div>
 
-            {/* Info */}
             <div className="flex-1 mt-6 md:mt-0 pb-8 text-center md:text-left">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
                 <h1 className="text-4xl md:text-6xl font-bold drop-shadow-md">
-                  {movie.title || movie.name} <span className="text-2xl text-muted-foreground font-normal">({(movie.release_date || movie.first_air_date || '').substring(0,4)})</span>
+                  {movie.title || movie.name} <span className="text-2xl text-muted-foreground font-normal">({(movie.release_date || movie.first_air_date || '').substring(0, 4)})</span>
                 </h1>
-                <button className="hidden md:flex items-center space-x-2 bg-secondary/80 hover:bg-secondary px-4 py-2 rounded-full border border-border transition-colors group">
-                  <Bookmark className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                  <span className="text-sm font-medium">Bookmark</span>
+                <button
+                  onClick={toggleWatchlist}
+                  disabled={watchlistLoading}
+                  className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-full border transition-all group ${
+                    inWatchlist
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-secondary/80 hover:bg-secondary border-border'
+                  }`}
+                >
+                  <div className="relative w-5 h-5">
+                    <Check className={`absolute inset-0 w-5 h-5 transition-all duration-300 ${inWatchlist ? 'scale-100 opacity-100' : 'scale-0 opacity-0'}`} />
+                    <Plus className={`absolute inset-0 w-5 h-5 transition-all duration-300 ${!inWatchlist ? 'scale-100 opacity-100' : 'scale-0 opacity-0 rotate-90'}`} />
+                  </div>
+                  <span className="text-sm font-medium">{inWatchlist ? 'In Watchlist' : 'Add to Watchlist'}</span>
                 </button>
               </div>
-              
+
               <p className="text-xl text-primary/80 italic mb-4">{movie.tagline}</p>
-              
+
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm text-muted-foreground mb-6">
                 <div className="flex items-center space-x-1">
                   <Star className="w-5 h-5 text-yellow-400 fill-current" />
@@ -211,10 +325,10 @@ export default function MovieDetails() {
       </section>
 
       <div className="container mx-auto px-4 mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12">
-        
+
         {/* Main Content (Cast, Crew) */}
         <div className="lg:col-span-2 space-y-12">
-          
+
           {/* Community Experiences */}
           <section className="bg-secondary/30 border border-border p-6 rounded-2xl">
             <div className="flex items-center justify-between mb-6">
@@ -223,7 +337,7 @@ export default function MovieDetails() {
                 <span>Community Experiences</span>
               </h3>
             </div>
-            
+
             <div className="space-y-4">
               <div className="bg-background/50 border border-border rounded-xl p-5">
                 <div className="flex justify-between items-start mb-3">
@@ -280,8 +394,8 @@ export default function MovieDetails() {
                 <div key={person.id} className="w-32 shrink-0 group cursor-pointer">
                   <div className="aspect-[2/3] rounded-lg overflow-hidden bg-secondary mb-2 border border-border group-hover:border-primary/50 transition-colors">
                     {person.profile_path ? (
-                      <img 
-                        src={getImageUrl(person.profile_path, 'w185')} 
+                      <img
+                        src={getImageUrl(person.profile_path, 'w185')}
                         alt={person.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -312,8 +426,8 @@ export default function MovieDetails() {
                 <div key={`${person.id}-${idx}`} className="w-32 shrink-0 group cursor-pointer">
                   <div className="aspect-[2/3] rounded-lg overflow-hidden bg-secondary mb-2 border border-border group-hover:border-primary/50 transition-colors">
                     {person.profile_path ? (
-                      <img 
-                        src={getImageUrl(person.profile_path, 'w185')} 
+                      <img
+                        src={getImageUrl(person.profile_path, 'w185')}
                         alt={person.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -335,42 +449,118 @@ export default function MovieDetails() {
               ))}
             </div>
           </section>
-
         </div>
 
-        {/* Sidebar (Groups) */}
-        <div className="space-y-6">
-          <h3 className="text-xl font-bold flex items-center space-x-2 mb-6">
-            <MessageSquare className="w-5 h-5 text-primary" />
-            <span>Related Discussions</span>
-          </h3>
-          
-          {MOCK_GROUPS.map((group) => (
-            <div key={group.id} className="bg-secondary/50 rounded-xl p-5 border border-border hover:border-primary/50 transition-colors cursor-pointer group flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="bg-background/80 text-xs px-2 py-1 rounded-full">{group.members} members</span>
-                </div>
-                <h4 className="text-lg font-bold mb-3 group-hover:text-primary transition-colors leading-tight">{group.title}</h4>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {group.tags.map(tag => (
-                    <span key={tag} className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-full font-medium uppercase tracking-wider">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <button 
-                onClick={(e) => { e.stopPropagation(); alert(`Joined ${group.title}!`); }}
-                className="w-full mt-auto py-2 bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground font-medium rounded-lg transition-colors text-sm"
-              >
-                Join Group
-              </button>
-            </div>
-          ))}
+        {/* Sidebar — Real Groups */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xl font-bold flex items-center space-x-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              <span>Related Discussions</span>
+            </h3>
+            {groups.length > 0 && (
+              <span className="text-xs text-muted-foreground">{groups.length} group{groups.length !== 1 ? 's' : ''}</span>
+            )}
+          </div>
 
-          <button className="w-full py-3 border border-dashed border-primary/50 text-primary rounded-xl font-medium hover:bg-primary/5 transition-colors">
-            + Create New Discussion
+          {groupsLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map(i => (
+                <div key={i} className="bg-secondary/30 rounded-xl p-5 border border-border animate-pulse h-36" />
+              ))}
+            </div>
+          ) : groups.length === 0 ? (
+            <div className="bg-secondary/20 border border-dashed border-border rounded-xl p-8 text-center">
+              <MessageSquare className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-1">No discussions yet</p>
+              <p className="text-xs text-muted-foreground/60">Be the first to start a group for this film!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {groups.map((group) => (
+                <div
+                  key={group.id}
+                  className="bg-secondary/50 rounded-xl p-4 border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between"
+                  onClick={() => handleOpenGroup(group.id)}
+                >
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="bg-background/80 text-xs px-2 py-1 rounded-full flex items-center space-x-1">
+                        <Users className="w-3 h-3" />
+                        <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
+                      </span>
+                      {group.isMember && (
+                        <span className="text-[10px] text-green-400 flex items-center space-x-1 font-medium">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Joined</span>
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-base font-bold mb-1 group-hover:text-primary transition-colors leading-tight">{group.name}</h4>
+                    {group.focus && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider inline-block mb-2">
+                        {group.focus}
+                      </span>
+                    )}
+                    {group.keywords && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {group.keywords.split(',').map(k => k.trim()).filter(Boolean).map(kw => (
+                          <span key={kw} className="text-[9px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded-full">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {group.description && (
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{group.description}</p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      group.isMember ? handleOpenGroup(group.id) : handleJoinGroup(group.id);
+                    }}
+                    disabled={joiningGroupId === group.id}
+                    className={`w-full mt-3 py-2 font-medium rounded-lg transition-all text-sm flex items-center justify-center space-x-2 ${
+                      group.isMember
+                        ? 'bg-primary/20 hover:bg-primary text-primary hover:text-primary-foreground'
+                        : token
+                          ? 'bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground border border-primary/30'
+                          : 'bg-secondary hover:bg-secondary/80 text-muted-foreground border border-border'
+                    }`}
+                  >
+                    {joiningGroupId === group.id ? (
+                      <span className="animate-pulse">Joining...</span>
+                    ) : group.isMember ? (
+                      <>
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Open Chat</span>
+                      </>
+                    ) : token ? (
+                      <>
+                        <Plus className="w-4 h-4" />
+                        <span>Join Group</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-4 h-4" />
+                        <span>Sign in to Join</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Create New Group CTA */}
+          <button
+            onClick={() => token ? navigate('/dashboard?tab=groups') : navigate('/')}
+            className="w-full py-3 border border-dashed border-primary/40 text-primary rounded-xl font-medium hover:bg-primary/5 hover:border-primary transition-colors flex items-center justify-center space-x-2 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Discussion</span>
           </button>
         </div>
 
