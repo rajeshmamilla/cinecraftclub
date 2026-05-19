@@ -112,3 +112,41 @@ export const getImageUrl = (path: string | null, size: 'w500' | 'w185' | 'origin
   if (!path) return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='750' viewBox='0 0 500 750'%3E%3Crect width='500' height='750' fill='%231a1a2e'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23555' font-family='sans-serif' font-size='24'%3ENo Image%3C/text%3E%3C/svg%3E`;
   return `${IMAGE_BASE_URL}/${size}${path}`;
 };
+
+export const getTopRatedMovies = async (page: number = 1): Promise<Movie[]> => {
+  try {
+    const response = await tmdbApi.get('/movie/top_rated', { params: { page } });
+    return response.data.results;
+  } catch (error) { return []; }
+};
+
+export const getNowPlayingMovies = async (page: number = 1): Promise<Movie[]> => {
+  try {
+    const response = await tmdbApi.get('/movie/now_playing', { params: { page } });
+    return response.data.results;
+  } catch (error) { return []; }
+};
+
+export const getUpcomingMovies = async (page: number = 1): Promise<Movie[]> => {
+  try {
+    const response = await tmdbApi.get('/movie/upcoming', { params: { page } });
+    return response.data.results;
+  } catch (error) { return []; }
+};
+
+export const discoverByGenre = async (genreId: number, page: number = 1): Promise<Movie[]> => {
+  try {
+    const response = await tmdbApi.get('/discover/movie', {
+      params: { with_genres: genreId, sort_by: 'popularity.desc', page }
+    });
+    return response.data.results;
+  } catch (error) { return []; }
+};
+
+export const getGenreList = async (): Promise<{ id: number; name: string }[]> => {
+  try {
+    const response = await tmdbApi.get('/genre/movie/list');
+    return response.data.genres;
+  } catch (error) { return []; }
+};
+

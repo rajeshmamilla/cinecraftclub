@@ -7,6 +7,7 @@ import com.c3.backend.dto.MessageRequest;
 import com.c3.backend.service.GroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,11 +32,18 @@ public class GroupController {
         return ResponseEntity.ok(groupService.getUserGroups(authentication.getName()));
     }
 
+    /** Resolves the real username from authentication, or null for anonymous/unauthenticated requests. */
+    private String resolveUsername(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return authentication.getName();
+    }
+
     /** Public endpoint — browse all public groups */
     @GetMapping("/public")
     public ResponseEntity<List<GroupResponse>> getAllPublicGroups(Authentication authentication) {
-        String username = (authentication != null && authentication.isAuthenticated()) ? authentication.getName() : null;
-        return ResponseEntity.ok(groupService.getAllPublicGroups(username));
+        return ResponseEntity.ok(groupService.getAllPublicGroups(resolveUsername(authentication)));
     }
 
     /** Public endpoint — fetch all public groups for a movie. Optionally enriches with isMember if logged in. */
@@ -43,16 +51,14 @@ public class GroupController {
     public ResponseEntity<List<GroupResponse>> getGroupsForMovie(
             @PathVariable Integer movieId,
             Authentication authentication) {
-        String username = (authentication != null && authentication.isAuthenticated()) ? authentication.getName() : null;
-        return ResponseEntity.ok(groupService.getGroupsForMovie(movieId, username));
+        return ResponseEntity.ok(groupService.getGroupsForMovie(movieId, resolveUsername(authentication)));
     }
 
     @GetMapping("/{groupId}")
     public ResponseEntity<GroupResponse> getGroupDetails(
             @PathVariable Integer groupId,
             Authentication authentication) {
-        String username = (authentication != null && authentication.isAuthenticated()) ? authentication.getName() : null;
-        return ResponseEntity.ok(groupService.getGroupDetails(groupId, username));
+        return ResponseEntity.ok(groupService.getGroupDetails(groupId, resolveUsername(authentication)));
     }
 
     @PostMapping("/{groupId}/join")

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, Plus, Check } from 'lucide-react';
+import { Star, Plus, Check, Lock } from 'lucide-react';
+import { toast } from 'sonner';
 import { getImageUrl } from '../../services/tmdb';
 import type { Movie } from '../../services/tmdb';
+import { getValidToken } from '../../utils/auth';
 
 interface MovieCardProps {
   movie: Movie;
@@ -15,13 +17,13 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
   useEffect(() => {
     const checkWatchlist = async () => {
-      const token = localStorage.getItem('jwtToken');
+      const token = getValidToken();
       if (!token) {
         setIsLoading(false);
         return;
       }
       try {
-        const res = await fetch(`http://localhost:8080/api/watchlist/check/${movie.id}`, {
+        const res = await fetch(`http://localhost:8080/api/watchlist/check/${movie.id}?t=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -39,8 +41,8 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
   const toggleWatchlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    const token = localStorage.getItem('jwtToken');
+
+    const token = getValidToken();
     if (!token) {
       // User is not logged in, buffer the action and trigger login modal
       localStorage.setItem('pendingAction', JSON.stringify({
@@ -61,12 +63,16 @@ export default function MovieCard({ movie }: MovieCardProps) {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        toast.error(`Removed from Watchlist`, {
+          description: movie.title || movie.name,
+          icon: '🗑️',
+        });
       } else {
         await fetch('http://localhost:8080/api/watchlist', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` 
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             movieId: movie.id,
@@ -78,40 +84,56 @@ export default function MovieCard({ movie }: MovieCardProps) {
             releaseDate: movie.release_date || movie.first_air_date
           })
         });
+        toast.success(`Added to Watchlist! 🎬`, {
+          description: movie.title || movie.name,
+          icon: '✅',
+        });
       }
     } catch (e) {
       // Revert on failure
       setInWatchlist(previousState);
+      toast.error('Something went wrong. Please try again.');
       console.error("Failed to update watchlist", e);
     }
   };
 
+  const releaseDate = movie.release_date || movie.first_air_date;
+  // No date = unconfirmed upcoming; future date = upcoming; past date = released
+  const isReleased = !!releaseDate && new Date(releaseDate) <= new Date();
+
   return (
-    <div 
+    <div
       onClick={() => navigate(`/media/${movie.media_type || 'movie'}/${movie.id}`)}
       className="group relative rounded-lg overflow-hidden poster-hover cursor-pointer shadow-lg bg-secondary"
     >
       <div className="aspect-[2/3] w-full relative">
-        <img 
-          src={getImageUrl(movie.poster_path)} 
+        <img
+          src={getImageUrl(movie.poster_path)}
           alt={movie.title || movie.name}
           className="w-full h-full object-cover"
         />
-        
+
+        {/* Coming Soon badge for unreleased movies */}
+        {!isReleased && (
+          <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-orange-600 to-amber-500 text-white text-[10px] font-black tracking-widest uppercase py-1 flex items-center justify-center space-x-1 z-20">
+            <Lock className="w-3 h-3" />
+            <span>Upcoming</span>
+          </div>
+        )}
+
         {/* Watchlist Toggle Button */}
         {!isLoading && (
           <button
             onClick={toggleWatchlist}
-            className={`absolute top-2 right-2 w-8 h-8 rounded-full backdrop-blur-md z-20 flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              inWatchlist 
-                ? 'bg-primary text-primary-foreground opacity-100 scale-100 rotate-0' 
-                : 'bg-black/50 text-white hover:bg-primary/90 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 hover:rotate-90'
-            }`}
+            className={`absolute top-2 right-2 w-8 h-8 z-20 flex items-center justify-center transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${inWatchlist
+                ? 'opacity-100 scale-100 rotate-0'
+                : 'opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 hover:rotate-90'
+              }`}
             title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
           >
             <div className="relative w-full h-full flex items-center justify-center">
-              <Check className={`absolute w-4 h-4 transition-all duration-300 ${inWatchlist ? 'scale-100 opacity-100 rotate-0' : 'scale-0 opacity-0 -rotate-90'}`} />
-              <Plus className={`absolute w-4 h-4 transition-all duration-300 ${!inWatchlist ? 'scale-100 opacity-100 rotate-0' : 'scale-0 opacity-0 rotate-90'}`} />
+              <Check className={`absolute w-5 h-5 text-white drop-shadow-lg transition-all duration-300 ${inWatchlist ? 'scale-100 opacity-100 rotate-0' : 'scale-0 opacity-0 -rotate-90'}`} />
+              <Plus className={`absolute w-5 h-5 text-white drop-shadow-lg transition-all duration-300 ${!inWatchlist ? 'scale-100 opacity-100 rotate-0' : 'scale-0 opacity-0 rotate-90'}`} />
             </div>
           </button>
         )}

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, Clapperboard, User, X } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Search, Clapperboard, User, X, Bookmark } from 'lucide-react';
 import { searchMulti, getImageUrl } from '../../services/tmdb';
 import type { Movie } from '../../services/tmdb';
+import { getValidToken } from '../../utils/auth';
 
 export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -19,18 +20,33 @@ export default function Navbar() {
   const [username, setUsername] = useState<string | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const currentPath = location.pathname;
+  const isWatchlistActive = currentPath === '/dashboard' && new URLSearchParams(location.search).get('tab') === 'watchlist';
 
   useEffect(() => {
-    const token = localStorage.getItem('jwtToken');
-    if (token) {
-      setIsLoggedIn(true);
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUsername(payload.sub);
-      } catch (e) {
-        console.error("Failed to parse JWT", e);
+    const checkAuth = () => {
+      const token = getValidToken();
+      if (token) {
+        setIsLoggedIn(true);
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          setUsername(payload.sub);
+        } catch (e) {
+          console.error("Failed to parse JWT", e);
+          setIsLoggedIn(false);
+          setUsername(null);
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUsername(null);
       }
-    }
+    };
+
+    checkAuth();
+    window.addEventListener('storage', checkAuth);
+    return () => window.removeEventListener('storage', checkAuth);
   }, []);
 
   useEffect(() => {
@@ -155,10 +171,48 @@ export default function Navbar() {
         </Link>
 
         {/* Navigation Links */}
-        <div className="hidden md:flex space-x-8">
-          <Link to="/" className="text-sm font-medium text-foreground hover:text-primary transition-colors">Home</Link>
-          <Link to="/movies" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Movies</Link>
-          <Link to="/groups" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Discussions</Link>
+        <div className="hidden md:flex items-center space-x-8">
+          <Link 
+            to="/" 
+            className={`text-sm font-medium transition-colors ${
+              currentPath === '/' 
+                ? 'text-foreground font-bold' 
+                : 'text-muted-foreground hover:text-primary'
+            }`}
+          >
+            Home
+          </Link>
+          <Link 
+            to="/movies" 
+            className={`text-sm font-medium transition-colors ${
+              currentPath.startsWith('/movies') || currentPath.startsWith('/media')
+                ? 'text-foreground font-bold' 
+                : 'text-muted-foreground hover:text-primary'
+            }`}
+          >
+            Movies
+          </Link>
+          <Link 
+            to="/groups" 
+            className={`text-sm font-medium transition-colors ${
+              currentPath.startsWith('/groups') || currentPath.startsWith('/group')
+                ? 'text-foreground font-bold' 
+                : 'text-muted-foreground hover:text-primary'
+            }`}
+          >
+            Groups
+          </Link>
+          <button
+            onClick={() => isLoggedIn ? navigate('/dashboard?tab=watchlist') : setIsAuthModalOpen(true)}
+            className={`flex items-center space-x-1.5 text-sm font-medium transition-colors ${
+              isWatchlistActive
+                ? 'text-foreground font-bold' 
+                : 'text-muted-foreground hover:text-primary'
+            }`}
+          >
+            <Bookmark className="w-4 h-4" />
+            <span>Watchlist</span>
+          </button>
         </div>
 
         {/* Actions Section */}

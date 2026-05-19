@@ -21,6 +21,9 @@ export default function UserDashboard() {
     // Extract token from URL if redirected from OAuth2
     const queryParams = new URLSearchParams(location.search);
     const urlToken = queryParams.get('token');
+    const urlTab = queryParams.get('tab');
+
+    if (urlTab) setActiveTab(urlTab);
 
     if (urlToken) {
       localStorage.setItem('jwtToken', urlToken);
@@ -88,21 +91,22 @@ export default function UserDashboard() {
     return a.watched ? 1 : -1; // true (watched) goes to bottom (1)
   });
 
-  // Typewriter effect
+  // Typewriter — types only the username, Welcome is static to avoid stale displayText bug
+  useEffect(() => { setDisplayText(""); }, []); // always clear on mount
+
   useEffect(() => {
     if (!username) return;
-    const fullText = `Welcome ${username}!`;
     let currentIndex = 0;
     setDisplayText("");
 
     const typingInterval = setInterval(() => {
-      if (currentIndex <= fullText.length) {
-        setDisplayText(fullText.slice(0, currentIndex));
+      if (currentIndex <= username.length) {
+        setDisplayText(username.slice(0, currentIndex));
         currentIndex++;
       } else {
         clearInterval(typingInterval);
       }
-    }, 100); // 100ms per character
+    }, 75);
 
     return () => clearInterval(typingInterval);
   }, [username]);
@@ -117,9 +121,19 @@ export default function UserDashboard() {
   return (
     <div className="container mx-auto px-4 py-12 max-w-7xl">
       <div className="flex justify-between items-center mb-10">
-        <h1 className="text-4xl font-bold font-mono min-h-[40px] text-primary">
-          {displayText}
-          <span className="animate-pulse">|</span>
+        <h1 className="flex items-baseline gap-3 min-h-[52px]">
+          {/* Cinematic italic serif — feels like a warm invitation */}
+          <span
+            style={{ fontFamily: "'Playfair Display', serif" }}
+            className="text-5xl italic font-medium text-white/70 tracking-wide"
+          >
+            Welcome,
+          </span>
+          {/* Username — bold, white, modern sans */}
+          <span className="text-4xl font-extrabold text-white tracking-tight">
+            {displayText}
+          </span>
+          <span className="text-primary text-3xl font-bold animate-pulse leading-none">|</span>
         </h1>
         <button
           onClick={handleLogout}

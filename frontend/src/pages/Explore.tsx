@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Star, TrendingUp, RefreshCw } from 'lucide-react';
-import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../services/tmdb';
+import { useParams } from 'react-router-dom';
+import { TrendingUp, RefreshCw } from 'lucide-react';
+import { getTrendingMovies, getPopularTeluguMovies } from '../services/tmdb';
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 
 export default function Explore() {
   const { category } = useParams<{ category: string }>();
-  const navigate = useNavigate();
   
   const [movies, setMovies] = useState<Movie[]>([]);
   const [page, setPage] = useState(1);

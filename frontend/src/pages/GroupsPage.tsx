@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film } from 'lucide-react';
 import { getImageUrl } from '../services/tmdb';
+import { getValidToken } from '../utils/auth';
 
 interface GroupResponse {
   id: number;
@@ -27,15 +28,16 @@ export default function GroupsPage() {
   const [selectedFocus, setSelectedFocus] = useState('All');
   const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
 
-  const token = localStorage.getItem('jwtToken');
+  const token = getValidToken();
 
   useEffect(() => {
     const fetchGroups = async () => {
+      const token = getValidToken(); // always read fresh
       setIsLoading(true);
       try {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch('http://localhost:8080/api/groups/public', { headers });
+        const res = await fetch(`http://localhost:8080/api/groups/public?t=${Date.now()}`, { headers });
         if (res.ok) setGroups(await res.json());
       } catch (e) {
         console.error(e);
@@ -43,7 +45,13 @@ export default function GroupsPage() {
         setIsLoading(false);
       }
     };
+
     fetchGroups();
+
+    // Re-fetch when user tabs back — catches join-state changes
+    const onFocus = () => fetchGroups();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   const handleJoin = async (groupId: number, e: React.MouseEvent) => {
