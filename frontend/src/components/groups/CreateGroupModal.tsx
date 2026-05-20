@@ -110,7 +110,7 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      
+
       <div className="relative w-full max-w-lg bg-background border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h2 className="text-xl font-bold">Create New Group</h2>
@@ -180,8 +180,8 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Focus Areas</label>
-                  
+                  <label className="text-sm font-medium">Topic</label>
+
                   {/* Selected Tags Display */}
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {selectedFocuses.map(focus => (
@@ -234,8 +234,8 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setShowSuggestions(false)} />
                         <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-background border border-border rounded-lg shadow-xl z-20 divide-y divide-border/50">
-                          {CRAFTS.filter(c => 
-                            !selectedFocuses.includes(c) && 
+                          {CRAFTS.filter(c =>
+                            !selectedFocuses.includes(c) &&
                             c.toLowerCase().includes(focusInput.toLowerCase())
                           ).map(craft => (
                             <button
@@ -251,14 +251,14 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
                               {craft}
                             </button>
                           ))}
-                          {CRAFTS.filter(c => 
-                            !selectedFocuses.includes(c) && 
+                          {CRAFTS.filter(c =>
+                            !selectedFocuses.includes(c) &&
                             c.toLowerCase().includes(focusInput.toLowerCase())
                           ).length === 0 && focusInput.trim() && (
-                            <div className="px-4 py-2 text-xs text-muted-foreground italic">
-                              Press Enter or click "Add" to insert "{focusInput}"
-                            </div>
-                          )}
+                              <div className="px-4 py-2 text-xs text-muted-foreground italic">
+                                Press Enter or click "Add" to insert "{focusInput}"
+                              </div>
+                            )}
                         </div>
                       </>
                     )}

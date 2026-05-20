@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, MessageSquare, Clock, Calendar, Users, User, ChevronLeft, ChevronRight, Plus, LogIn, CheckCircle, Check, Lock } from 'lucide-react';
+import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMediaDetails, getImageUrl } from '../services/tmdb';
 import type { MovieDetails as MovieDetailsType } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
+import RatingModal from '../components/movie/RatingModal';
 
 interface GroupResponse {
   id: number;
@@ -23,9 +24,7 @@ export default function MovieDetails() {
   const [movie, setMovie] = useState<MovieDetailsType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
-  const [hoveredRating, setHoveredRating] = useState<number>(0);
-  const [isReviewPanelOpen, setIsReviewPanelOpen] = useState(true);
-  const [reviewText, setReviewText] = useState("");
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
 
   // Groups state
   const [groups, setGroups] = useState<GroupResponse[]>([]);
@@ -37,16 +36,6 @@ export default function MovieDetails() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
 
   const token = getValidToken();
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 150 && isReviewPanelOpen) {
-        setIsReviewPanelOpen(false);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isReviewPanelOpen]);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -160,16 +149,6 @@ export default function MovieDetails() {
     navigate(`/group/${groupId}`);
   };
 
-  const handleRatingSubmit = () => {
-    if (userRating > 0 && reviewText.length > 0) {
-      toast.success('Review Submitted! ⭐', {
-        description: `You rated "${movie?.title || movie?.name}" ${userRating}/10`,
-      });
-      setUserRating(0);
-      setReviewText('');
-    }
-  };
-
   // Determine if movie is already released.
   // Primary: Use TMDB 'status' field — reliable even with no release date.
   //   Released movies always have status === 'Released'.
@@ -195,93 +174,17 @@ export default function MovieDetails() {
   return (
     <div className="w-full pb-16 relative">
 
-      {/* Unreleased banner — only visible on mobile where the side panel is hidden */}
-      {!isReleased && (
-        <div className="fixed top-16 left-0 right-0 z-40 bg-gradient-to-r from-orange-600 to-amber-500 text-white text-center py-2 text-sm font-bold tracking-wide flex items-center justify-center space-x-2 shadow-lg">
-          <Lock className="w-4 h-4" />
-          <span>🚫 Not Yet Released — Ratings Disabled</span>
-        </div>
-      )}
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={isRatingOpen}
+        onClose={() => setIsRatingOpen(false)}
+        movieId={Number(id)}
+        mediaType={type || 'movie'}
+        movieTitle={movie.title || movie.name || ''}
+        posterPath={movie.poster_path || ''}
+        onSuccess={(r) => setUserRating(r)}
+      />
 
-      {/* Slide-out Review Panel */}
-      <div
-        className={`fixed top-1/4 right-0 z-50 transition-transform duration-500 flex ${isReviewPanelOpen ? 'translate-x-0' : 'translate-x-[400px]'}`}
-      >
-        {/* Tab handle — hidden for unreleased movies */}
-        {isReleased && (
-          <button
-            onClick={() => setIsReviewPanelOpen(!isReviewPanelOpen)}
-            className={`absolute ${isReviewPanelOpen ? '-left-10' : '-left-[92px]'} top-1/2 -translate-y-1/2 bg-secondary/90 backdrop-blur border border-r-0 border-border py-3 px-2 rounded-l-xl shadow-2xl hover:bg-secondary transition-all duration-300 flex items-center group cursor-pointer`}
-          >
-            {!isReviewPanelOpen && (
-              <span className="font-bold tracking-wider text-primary ml-1 mr-1 text-sm animate-pulse drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]">
-                RATE
-              </span>
-            )}
-            {isReviewPanelOpen ? (
-              <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-foreground" />
-            ) : (
-              <ChevronLeft className="w-6 h-6 text-primary animate-pulse drop-shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-            )}
-          </button>
-        )}
-
-        <div className="w-[400px] bg-background/95 backdrop-blur-xl border border-border shadow-2xl rounded-l-2xl p-8 flex flex-col h-[550px] relative overflow-hidden">
-          {/* Lock overlay for unreleased movies */}
-          {!isReleased && (
-            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center text-center rounded-l-2xl">
-              <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mb-4">
-                <Lock className="w-8 h-8 text-amber-400" />
-              </div>
-              <h3 className="text-lg font-bold mb-2 text-amber-400">Upcoming Film</h3>
-              <p className="text-sm text-muted-foreground max-w-[260px] leading-relaxed">
-                Ratings open after this film releases.
-              </p>
-            </div>
-          )}
-
-          <h3 className="text-2xl font-bold mb-6">Rate this Film</h3>
-
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                <button
-                  key={star}
-                  onMouseEnter={() => !isReleased ? undefined : setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(0)}
-                  onClick={() => !isReleased ? undefined : setUserRating(star)}
-                  disabled={!isReleased}
-                  className="p-1 focus:outline-none transition-transform hover:scale-125 disabled:cursor-not-allowed"
-                >
-                  <Star
-                    className={`w-5 h-5 transition-colors ${(hoveredRating || userRating) >= star ? 'text-yellow-400 fill-current' : 'text-muted-foreground'}`}
-                  />
-                </button>
-              ))}
-            </div>
-            <span className="font-bold text-xl ml-2">{userRating > 0 ? `${userRating}/10` : '-/10'}</span>
-          </div>
-
-          <h4 className="text-sm font-semibold mb-2">Your Experience</h4>
-          <textarea
-            placeholder="Write your review here..."
-            value={reviewText}
-            disabled={!isReleased}
-            onChange={(e) => setReviewText(e.target.value)}
-            className="flex-1 w-full bg-secondary/50 border border-border rounded-lg p-3 text-sm focus:outline-none focus:border-primary transition-colors resize-none mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-
-          <button
-            onClick={handleRatingSubmit}
-            disabled={!isReleased || userRating === 0 || reviewText.length === 0}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Submit
-          </button>
-        </div>
-      </div>
-
-      {/* Hero Section */}
       <section className="relative w-full">
         <div className="absolute inset-0 h-[60vh] md:h-[80vh] w-full z-0">
           <img
@@ -349,6 +252,25 @@ export default function MovieDetails() {
                   <Calendar className="w-4 h-4" />
                   <span>{movie.release_date || movie.first_air_date}</span>
                 </div>
+                {isReleased && (
+                  <>
+                    <div className="w-1 h-1 bg-border rounded-full" />
+                    <button
+                      onClick={() => {
+                        if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
+                        setIsRatingOpen(true);
+                      }}
+                      className={`flex items-center space-x-1.5 px-3 py-1 rounded-full border transition-all font-semibold ${
+                        userRating > 0
+                          ? 'bg-yellow-400/15 border-yellow-400/40 text-yellow-400 hover:bg-yellow-400/25'
+                          : 'bg-secondary/80 border-border hover:bg-secondary hover:text-primary hover:border-primary'
+                      }`}
+                    >
+                      <Star className={`w-4 h-4 ${userRating > 0 ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                      <span className="text-sm">{userRating > 0 ? `${userRating}/10` : 'Rate'}</span>
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2 mb-6 justify-center md:justify-start">

@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Star, Check, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getImageUrl } from '../../services/tmdb';
+import RatingModal from './RatingModal';
 
 interface WatchlistItemData {
   movieId: number;
@@ -22,6 +24,8 @@ interface WatchlistListItemProps {
 
 export default function WatchlistListItem({ item, index, onToggleWatched }: WatchlistListItemProps) {
   const navigate = useNavigate();
+  const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [userRating, setUserRating] = useState<number>(0);
 
   return (
     <div className="flex border-b border-border py-4 first:pt-0 group hover:bg-secondary/20 transition-colors rounded-lg px-2 -mx-2">
@@ -68,9 +72,16 @@ export default function WatchlistListItem({ item, index, onToggleWatched }: Watc
               <Star className="w-4 h-4 fill-current" />
               <span className="font-medium text-foreground">{item.voteAverage?.toFixed(1)}</span>
             </div>
-            <button className="flex items-center space-x-1 text-primary hover:text-primary/80 transition-colors">
-              <Star className="w-4 h-4" />
-              <span>Rate</span>
+            <button
+              onClick={() => setIsRatingOpen(true)}
+              className={`flex items-center space-x-1 transition-colors ${
+                userRating > 0
+                  ? 'text-yellow-400 hover:text-yellow-300'
+                  : 'text-primary hover:text-primary/80'
+              }`}
+            >
+              <Star className={`w-4 h-4 ${userRating > 0 ? 'fill-yellow-400' : ''}`} />
+              <span>{userRating > 0 ? `${userRating}/10` : 'Rate'}</span>
             </button>
           </div>
           
@@ -86,6 +97,18 @@ export default function WatchlistListItem({ item, index, onToggleWatched }: Watc
           </span>
         </div>
       </div>
+
+      {/* Rating Modal */}
+      <RatingModal
+        isOpen={isRatingOpen}
+        onClose={() => setIsRatingOpen(false)}
+        movieId={item.movieId}
+        mediaType={item.mediaType || 'movie'}
+        movieTitle={item.title}
+        posterPath={item.posterPath}
+        onSuccess={(r) => setUserRating(r)}
+      />
     </div>
   );
 }
+

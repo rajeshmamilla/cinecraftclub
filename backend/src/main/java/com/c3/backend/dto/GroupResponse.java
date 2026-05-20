@@ -3,6 +3,7 @@ package com.c3.backend.dto;
 import lombok.Builder;
 import lombok.Data;
 import java.time.ZonedDateTime;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Data
 @Builder
@@ -19,6 +20,7 @@ public class GroupResponse {
     private String createdBy;
     private ZonedDateTime createdAt;
     private int memberCount;
+    @JsonProperty("isMember")
     private boolean isMember;
     private String joinRequestStatus;
 }

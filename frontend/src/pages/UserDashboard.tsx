@@ -15,6 +15,7 @@ export default function UserDashboard() {
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
@@ -50,15 +51,17 @@ export default function UserDashboard() {
     
     const fetchData = async () => {
       try {
-        const [wlRes, grRes, reqRes] = await Promise.all([
+        const [wlRes, grRes, reqRes, ratRes] = await Promise.all([
           fetch('http://localhost:8080/api/watchlist', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/groups/requests?status=PENDING', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('http://localhost:8080/api/groups/requests?status=PENDING', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('http://localhost:8080/api/ratings', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (wlRes.ok) setWatchlist(await wlRes.json());
         if (grRes.ok) setGroups(await grRes.json());
         if (reqRes.ok) setJoinRequests(await reqRes.json());
+        if (ratRes.ok) setRatings(await ratRes.json());
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
       } finally {
@@ -360,14 +363,67 @@ export default function UserDashboard() {
           )}
 
           {activeTab === 'ratings' && (
-            <div className="h-full w-full flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
-              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                <Star className="w-8 h-8" />
+            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold mb-1">Your Ratings</h2>
+                <p className="text-sm text-muted-foreground">Films you've rated and reviewed.</p>
               </div>
-              <h2 className="text-2xl font-bold">No Ratings Yet</h2>
-              <p className="text-muted-foreground max-w-sm mx-auto">
-                Start reviewing your favorite films to build your rating profile.
-              </p>
+
+              {isLoading ? (
+                <div className="animate-pulse py-20 text-center text-muted-foreground">Loading...</div>
+              ) : ratings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                  <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold">No Ratings Yet</h3>
+                  <p className="text-muted-foreground max-w-sm">
+                    Start reviewing your favorite films to build your rating profile.
+                  </p>
+                  <button onClick={() => navigate('/explore/trending')} className="mt-2 bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors">
+                    Explore Films
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {ratings.map((r: any) => (
+                    <div
+                      key={r.id}
+                      onClick={() => navigate(`/media/${r.mediaType || 'movie'}/${r.movieId}`)}
+                      className="flex items-start space-x-4 p-4 bg-secondary/40 border border-border rounded-xl cursor-pointer hover:border-primary/50 hover:bg-secondary/60 transition-all group"
+                    >
+                      <img
+                        src={getImageUrl(r.posterPath, 'w185')}
+                        alt={r.movieTitle}
+                        className="w-14 h-20 object-cover rounded-lg shrink-0 shadow-md"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-bold text-sm group-hover:text-primary transition-colors line-clamp-1">{r.movieTitle}</h3>
+                          <div className="flex items-center space-x-1 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full shrink-0">
+                            <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                            <span className="text-xs font-bold text-yellow-400">{r.rating}/10</span>
+                          </div>
+                        </div>
+                        {/* Mini star display */}
+                        <div className="flex items-center gap-0.5 my-1.5">
+                          {[1,2,3,4,5,6,7,8,9,10].map(s => (
+                            <Star key={s} className={`w-3 h-3 ${s <= r.rating ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30'}`} />
+                          ))}
+                        </div>
+                        {r.review ? (
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{r.review}</p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/50 italic">No review written</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/50 mt-1">
+                          Rated {new Date(r.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
