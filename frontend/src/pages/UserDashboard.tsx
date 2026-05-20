@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Bookmark, Star, Users, Settings, LogOut, Plus, MessageSquare } from 'lucide-react';
+import { Bookmark, Star, Users, Settings, LogOut, Plus, MessageSquare, Clock, CheckCircle } from 'lucide-react';
 import WatchlistListItem from '../components/movie/WatchlistListItem';
 import CreateGroupModal from '../components/groups/CreateGroupModal';
 import { getImageUrl } from '../services/tmdb';
@@ -14,6 +14,7 @@ export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState('watchlist');
   const [watchlist, setWatchlist] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
@@ -49,13 +50,15 @@ export default function UserDashboard() {
     
     const fetchData = async () => {
       try {
-        const [wlRes, grRes] = await Promise.all([
+        const [wlRes, grRes, reqRes] = await Promise.all([
           fetch('http://localhost:8080/api/watchlist', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('http://localhost:8080/api/groups/requests?status=PENDING', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (wlRes.ok) setWatchlist(await wlRes.json());
         if (grRes.ok) setGroups(await grRes.json());
+        if (reqRes.ok) setJoinRequests(await reqRes.json());
       } catch (err) {
         console.error("Failed to fetch dashboard data", err);
       } finally {
@@ -82,6 +85,24 @@ export default function UserDashboard() {
     } catch (e) {
       console.error("Failed to toggle watched status", e);
       // Optionally revert if failed
+    }
+  };
+
+  const handleRespondRequest = async (requestId: number, action: 'APPROVE' | 'REJECT') => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/groups/requests/${requestId}/respond?action=${action}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+        if (action === 'APPROVE') {
+          const grRes = await fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+          if (grRes.ok) setGroups(await grRes.json());
+        }
+      }
+    } catch (e) {
+      console.error("Failed to respond to join request", e);
     }
   };
 
@@ -171,6 +192,21 @@ export default function UserDashboard() {
             <span>Groups</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors ${activeTab === 'requests' ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`}
+          >
+            <div className="flex items-center space-x-3">
+              <Clock className="w-5 h-5" />
+              <span>Join Requests</span>
+            </div>
+            {joinRequests.length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                {joinRequests.length}
+              </span>
+            )}
+          </button>
+
           <div className="my-4 border-t border-border"></div>
 
           <button
@@ -254,14 +290,67 @@ export default function UserDashboard() {
                       onClick={() => navigate(`/group/${group.id}`)}
                       className="flex items-center space-x-4 p-4 bg-secondary/50 border border-border rounded-xl cursor-pointer hover:border-primary/50 hover:bg-secondary transition-all group"
                     >
-                      <img src={getImageUrl(group.moviePoster, 'w185')} alt="" className="w-12 h-16 object-cover rounded-lg shadow-md" />
+                      <img src={getImageUrl(group.moviePoster, 'w185')} alt="" className="w-20 h-12 object-cover rounded-lg shadow-md shrink-0" />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold truncate group-hover:text-primary transition-colors">{group.name}</h3>
-                        <p className="text-xs text-primary font-medium mb-1">{group.focus}</p>
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="text-xs text-primary font-medium">{group.focus}</p>
+                          <p className="text-[10px] text-muted-foreground">by {group.createdBy}</p>
+                        </div>
                         <div className="flex items-center space-x-2 text-[10px] text-muted-foreground">
                           <MessageSquare className="w-3 h-3" />
                           <span>Open Chat</span>
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'requests' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Join Requests</h2>
+                <p className="text-sm text-muted-foreground">Manage requests from users wanting to join your private groups.</p>
+              </div>
+
+              {joinRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                  <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">No Pending Requests</h3>
+                    <p className="text-sm text-muted-foreground">You are all caught up!</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {joinRequests.map((req) => (
+                    <div key={req.id} className="flex items-center justify-between p-4 bg-secondary/50 border border-border/60 rounded-xl">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm">
+                          <span className="text-primary font-bold">{req.username}</span> wants to join <span className="text-foreground font-semibold">{req.groupName}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Movie discussion: {req.movieTitle}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <button
+                          onClick={() => handleRespondRequest(req.id, 'REJECT')}
+                          className="px-3 py-1.5 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => handleRespondRequest(req.id, 'APPROVE')}
+                          className="px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Accept
+                        </button>
                       </div>
                     </div>
                   ))}

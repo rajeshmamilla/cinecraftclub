@@ -541,9 +541,13 @@ export default function MovieDetails() {
                     </div>
                     <h4 className="text-base font-bold mb-1 group-hover:text-primary transition-colors leading-tight">{group.name}</h4>
                     {group.focus && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider inline-block mb-2">
-                        {group.focus}
-                      </span>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {group.focus.split(',').map(f => f.trim()).filter(Boolean).map(f => (
+                          <span key={f} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider inline-block">
+                            {f}
+                          </span>
+                        ))}
+                      </div>
                     )}
                     {group.keywords && (
                       <div className="flex flex-wrap gap-1 mb-2">
@@ -555,8 +559,11 @@ export default function MovieDetails() {
                       </div>
                     )}
                     {group.description && (
-                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{group.description}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-2">{group.description}</p>
                     )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Created by: <span className="font-semibold text-foreground">{group.createdBy}</span>
+                    </p>
                   </div>
 
                   <button

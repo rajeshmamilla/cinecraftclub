@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film } from 'lucide-react';
+import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film, Lock, Clock, XCircle } from 'lucide-react';
 import { getImageUrl } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
 
@@ -16,6 +16,8 @@ interface GroupResponse {
   memberCount: number;
   isMember: boolean;
   createdBy: string;
+  isPrivate: boolean;
+  joinRequestStatus?: 'PENDING' | 'APPROVED' | 'DENIED' | null;
 }
 
 const FOCUS_FILTERS = ['All', 'Direction', 'Screenplay & Writing', 'Cinematography', 'Acting', 'Music & Sound', 'VFX & Animation', 'General Discussion', 'Editing', 'Action & Stunts'];
@@ -72,6 +74,23 @@ export default function GroupsPage() {
     }
   };
 
+  const handleRequestToJoin = async (groupId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!token) { navigate('/'); return; }
+    setJoiningGroupId(groupId);
+    try {
+      const res = await fetch(`http://localhost:8080/api/groups/${groupId}/request`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setGroups(prev => prev.map(g => g.id === groupId ? { ...g, joinRequestStatus: 'PENDING' } : g));
+      }
+    } finally {
+      setJoiningGroupId(null);
+    }
+  };
+
   const handleOpen = (groupId: number) => {
     if (!token) { navigate('/'); return; }
     navigate(`/group/${groupId}`);
@@ -79,7 +98,7 @@ export default function GroupsPage() {
 
   const filtered = groups.filter(g => {
     const matchSearch = !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase()) || g.movieTitle?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchFocus = selectedFocus === 'All' || g.focus === selectedFocus;
+    const matchFocus = selectedFocus === 'All' || (g.focus && g.focus.split(',').map(f => f.trim().toLowerCase()).includes(selectedFocus.toLowerCase()));
     return matchSearch && matchFocus;
   });
 
@@ -205,11 +224,11 @@ export default function GroupsPage() {
                 <h3 className="font-bold text-base leading-tight mb-1 group-hover:text-primary transition-colors line-clamp-2">{group.name}</h3>
 
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {group.focus && (
-                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">
-                      {group.focus}
+                  {group.focus && group.focus.split(',').map(f => f.trim()).filter(Boolean).map(f => (
+                    <span key={f} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">
+                      {f}
                     </span>
-                  )}
+                  ))}
                   {group.keywords && group.keywords.split(',').slice(0, 2).map(k => k.trim()).filter(Boolean).map(kw => (
                     <span key={kw} className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full">
                       {kw}
@@ -222,41 +241,67 @@ export default function GroupsPage() {
                 )}
 
                 <div className="flex items-center justify-between mt-auto pt-3 border-t border-border/50">
-                  <span className="text-xs text-muted-foreground flex items-center space-x-1">
-                    <Users className="w-3 h-3" />
-                    <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
-                  </span>
+                  <div className="flex flex-col text-[11px] text-muted-foreground">
+                    <span className="flex items-center space-x-1">
+                      <Users className="w-3.5 h-3.5 text-primary/70" />
+                      <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="mt-0.5">Created by: <span className="font-semibold text-foreground">{group.createdBy}</span></span>
+                  </div>
 
-                  <button
-                    onClick={e => group.isMember ? handleOpen(group.id) : handleJoin(group.id, e)}
-                    disabled={joiningGroupId === group.id}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1 ${
-                      group.isMember
-                        ? 'bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground'
-                        : token
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                          : 'bg-secondary text-muted-foreground border border-border'
-                    }`}
-                  >
-                    {joiningGroupId === group.id ? (
-                      <span className="animate-pulse">...</span>
-                    ) : group.isMember ? (
-                      <>
-                        <MessageSquare className="w-3 h-3" />
-                        <span>Open</span>
-                      </>
-                    ) : token ? (
-                      <>
-                        <Plus className="w-3 h-3" />
-                        <span>Join</span>
-                      </>
+                  {group.isMember ? (
+                    <button
+                      onClick={() => handleOpen(group.id)}
+                      className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1 bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      <span>Open</span>
+                    </button>
+                  ) : !token ? (
+                    <button
+                      onClick={() => navigate('/')}
+                      className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1 bg-secondary text-muted-foreground border border-border"
+                    >
+                      <LogIn className="w-3 h-3" />
+                      <span>Sign in</span>
+                    </button>
+                  ) : group.isPrivate ? (
+                    group.joinRequestStatus === 'PENDING' ? (
+                      <button
+                        disabled
+                        className="text-xs px-3 py-1.5 rounded-lg font-bold flex items-center space-x-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 cursor-not-allowed"
+                      >
+                        <Clock className="w-3 h-3 animate-pulse" />
+                        <span>Pending</span>
+                      </button>
+                    ) : group.joinRequestStatus === 'DENIED' ? (
+                      <button
+                        disabled
+                        className="text-xs px-3 py-1.5 rounded-lg font-bold flex items-center space-x-1 bg-red-500/10 text-red-500 border border-red-500/20 cursor-not-allowed"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        <span>Denied</span>
+                      </button>
                     ) : (
-                      <>
-                        <LogIn className="w-3 h-3" />
-                        <span>Sign in</span>
-                      </>
-                    )}
-                  </button>
+                      <button
+                        onClick={e => handleRequestToJoin(group.id, e)}
+                        disabled={joiningGroupId === group.id}
+                        className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1 bg-primary/20 text-primary hover:bg-primary hover:text-primary-foreground border border-primary/20"
+                      >
+                        <Lock className="w-3 h-3" />
+                        <span>Request</span>
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      onClick={e => handleJoin(group.id, e)}
+                      disabled={joiningGroupId === group.id}
+                      className="text-xs px-3 py-1.5 rounded-lg font-bold transition-all flex items-center space-x-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Join</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

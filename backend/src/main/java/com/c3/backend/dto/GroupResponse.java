@@ -20,4 +20,5 @@ public class GroupResponse {
     private ZonedDateTime createdAt;
     private int memberCount;
     private boolean isMember;
+    private String joinRequestStatus;
 }

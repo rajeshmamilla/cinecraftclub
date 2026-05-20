@@ -1,5 +1,6 @@
 package com.c3.backend.controller;
 
+import com.c3.backend.dto.GroupJoinRequestResponse;
 import com.c3.backend.dto.GroupMessageResponse;
 import com.c3.backend.dto.GroupRequest;
 import com.c3.backend.dto.GroupResponse;
@@ -66,6 +67,28 @@ public class GroupController {
             Authentication authentication,
             @PathVariable Integer groupId) {
         return ResponseEntity.ok(groupService.joinGroup(authentication.getName(), groupId));
+    }
+
+    @PostMapping("/{groupId}/request")
+    public ResponseEntity<GroupResponse> requestToJoinGroup(
+            Authentication authentication,
+            @PathVariable Integer groupId) {
+        return ResponseEntity.ok(groupService.requestToJoinGroup(authentication.getName(), groupId));
+    }
+
+    @GetMapping("/requests")
+    public ResponseEntity<List<GroupJoinRequestResponse>> getAdminJoinRequests(
+            Authentication authentication,
+            @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(groupService.getAdminJoinRequests(authentication.getName(), status));
+    }
+
+    @PostMapping("/requests/{requestId}/respond")
+    public ResponseEntity<GroupJoinRequestResponse> respondToJoinRequest(
+            Authentication authentication,
+            @PathVariable Integer requestId,
+            @RequestParam String action) {
+        return ResponseEntity.ok(groupService.respondToJoinRequest(authentication.getName(), requestId, action));
     }
 
     @DeleteMapping("/{groupId}/leave")

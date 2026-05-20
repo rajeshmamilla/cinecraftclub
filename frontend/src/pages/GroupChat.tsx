@@ -150,7 +150,7 @@ export default function GroupChat() {
                   String(g.id) === id ? 'bg-primary/10 border-r-2 border-primary' : ''
                 }`}
               >
-                <div className="w-9 h-12 rounded overflow-hidden shrink-0 border border-border/50">
+                <div className="w-14 h-9 rounded overflow-hidden shrink-0 border border-border/50">
                   <img src={getImageUrl(g.moviePoster, 'w185')} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -183,7 +183,7 @@ export default function GroupChat() {
               <button onClick={() => navigate('/groups')} className="p-1.5 hover:bg-secondary rounded-full md:hidden">
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div className="w-8 h-10 rounded overflow-hidden border border-border shrink-0">
+              <div className="w-14 h-9 rounded overflow-hidden border border-border shrink-0">
                 <img src={getImageUrl(group.moviePoster, 'w185')} alt="" className="w-full h-full object-cover" />
               </div>
               <div>

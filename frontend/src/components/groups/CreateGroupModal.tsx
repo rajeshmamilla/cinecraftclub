@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Search, ChevronDown, Lock, Globe } from 'lucide-react';
+import { X, Search, Lock, Globe } from 'lucide-react';
 import { searchMulti, getImageUrl } from '../../services/tmdb';
 import type { Movie } from '../../services/tmdb';
 
@@ -31,11 +31,13 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
 
   const [formData, setFormData] = useState({
     name: "",
-    focus: CRAFTS[0],
-    keywords: "",
     description: "",
     isPrivate: false
   });
+
+  const [selectedFocuses, setSelectedFocuses] = useState<string[]>(["General Discussion"]);
+  const [focusInput, setFocusInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,15 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
 
   if (!isOpen) return null;
 
+  const handleAddCustomFocus = () => {
+    const trimmed = focusInput.trim();
+    if (trimmed && !selectedFocuses.includes(trimmed)) {
+      setSelectedFocuses(prev => [...prev, trimmed]);
+      setFocusInput("");
+      setShowSuggestions(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!selectedMovie || !formData.name) return;
 
@@ -71,10 +82,14 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          focus: selectedFocuses.join(', '),
+          keywords: "",
+          description: formData.description,
+          isPrivate: formData.isPrivate,
           movieId: selectedMovie.id,
           movieTitle: selectedMovie.title || selectedMovie.name,
-          moviePoster: selectedMovie.poster_path
+          moviePoster: selectedMovie.backdrop_path || selectedMovie.poster_path
         })
       });
 
@@ -164,29 +179,89 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Focus</label>
-                    <div className="relative">
-                      <select
-                        className="w-full bg-secondary/50 border border-border focus:border-primary focus:outline-none px-4 py-2 rounded-lg appearance-none cursor-pointer"
-                        value={formData.focus}
-                        onChange={(e) => setFormData({ ...formData, focus: e.target.value })}
-                      >
-                        {CRAFTS.map(craft => <option key={craft} value={craft}>{craft}</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                    </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Focus Areas</label>
+                  
+                  {/* Selected Tags Display */}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedFocuses.map(focus => (
+                      <span key={focus} className="flex items-center space-x-1 text-xs bg-primary/20 text-primary px-2.5 py-1 rounded-full font-bold">
+                        <span>{focus}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFocuses(prev => prev.filter(f => f !== focus))}
+                          className="hover:text-red-500 rounded-full transition-colors ml-1 focus:outline-none"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {selectedFocuses.length === 0 && (
+                      <span className="text-xs text-muted-foreground italic">No focus area selected</span>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Keywords</label>
-                    <input
-                      type="text"
-                      placeholder="vfx, lighting, etc."
-                      className="w-full bg-secondary/50 border border-border focus:border-primary focus:outline-none px-4 py-2 rounded-lg"
-                      value={formData.keywords}
-                      onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                    />
+
+                  {/* Input with Auto-suggestions */}
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type a focus craft or search suggestions..."
+                        className="flex-1 bg-secondary/50 border border-border focus:border-primary focus:outline-none px-3 py-2 rounded-lg text-sm transition-colors"
+                        value={focusInput}
+                        onChange={(e) => {
+                          setFocusInput(e.target.value);
+                          setShowSuggestions(true);
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomFocus();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomFocus}
+                        className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-lg text-sm font-semibold transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+
+                    {showSuggestions && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowSuggestions(false)} />
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-background border border-border rounded-lg shadow-xl z-20 divide-y divide-border/50">
+                          {CRAFTS.filter(c => 
+                            !selectedFocuses.includes(c) && 
+                            c.toLowerCase().includes(focusInput.toLowerCase())
+                          ).map(craft => (
+                            <button
+                              key={craft}
+                              type="button"
+                              onClick={() => {
+                                setSelectedFocuses(prev => [...prev, craft]);
+                                setFocusInput("");
+                                setShowSuggestions(false);
+                              }}
+                              className="w-full text-left px-4 py-2 hover:bg-secondary/80 text-sm transition-colors text-foreground"
+                            >
+                              {craft}
+                            </button>
+                          ))}
+                          {CRAFTS.filter(c => 
+                            !selectedFocuses.includes(c) && 
+                            c.toLowerCase().includes(focusInput.toLowerCase())
+                          ).length === 0 && focusInput.trim() && (
+                            <div className="px-4 py-2 text-xs text-muted-foreground italic">
+                              Press Enter or click "Add" to insert "{focusInput}"
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -226,7 +301,7 @@ export default function CreateGroupModal({ isOpen, onClose, onSuccess }: CreateG
                 </button>
                 <button
                   onClick={handleCreate}
-                  disabled={isLoading || !formData.name}
+                  disabled={isLoading || !formData.name || selectedFocuses.length === 0}
                   className="flex-[2] px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                 >
                   {isLoading ? "Creating..." : "Create Group"}

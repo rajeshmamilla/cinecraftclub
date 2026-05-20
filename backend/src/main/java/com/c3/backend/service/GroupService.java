@@ -1,11 +1,14 @@
 package com.c3.backend.service;
 
+import com.c3.backend.dto.GroupJoinRequestResponse;
 import com.c3.backend.dto.GroupMessageResponse;
 import com.c3.backend.dto.GroupRequest;
 import com.c3.backend.dto.GroupResponse;
+import com.c3.backend.model.GroupJoinRequest;
 import com.c3.backend.model.GroupMessage;
 import com.c3.backend.model.MovieGroup;
 import com.c3.backend.model.User;
+import com.c3.backend.repository.GroupJoinRequestRepository;
 import com.c3.backend.repository.GroupMessageRepository;
 import com.c3.backend.repository.MovieGroupRepository;
 import com.c3.backend.repository.UserRepository;
@@ -24,11 +27,23 @@ public class GroupService {
     private final MovieGroupRepository groupRepository;
     private final GroupMessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final GroupJoinRequestRepository joinRequestRepository;
 
     // --- Helper to convert MovieGroup -> GroupResponse ---
     private GroupResponse toResponse(MovieGroup group, String currentUsername) {
         boolean isMember = currentUsername != null && group.getMembers().stream()
                 .anyMatch(m -> m.getUsername().equals(currentUsername));
+
+        String joinRequestStatus = null;
+        if (currentUsername != null && !isMember) {
+            Optional<User> userOpt = userRepository.findByUsername(currentUsername);
+            if (userOpt.isPresent()) {
+                joinRequestStatus = joinRequestRepository.findByGroupIdAndUserId(group.getId(), userOpt.get().getId())
+                        .map(GroupJoinRequest::getStatus)
+                        .orElse(null);
+            }
+        }
+
         return GroupResponse.builder()
                 .id(group.getId())
                 .name(group.getName())
@@ -43,6 +58,7 @@ public class GroupService {
                 .createdAt(group.getCreatedAt())
                 .memberCount(group.getMembers().size())
                 .isMember(isMember)
+                .joinRequestStatus(joinRequestStatus)
                 .build();
     }
 
@@ -171,5 +187,91 @@ public class GroupService {
                 .createdAt(m.getCreatedAt())
                 .build()
         ).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public GroupResponse requestToJoinGroup(String username, Integer groupId) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        MovieGroup group = getGroupEntity(groupId);
+
+        if (group.getMembers().contains(user)) {
+            throw new RuntimeException("User is already a member of this group");
+        }
+
+        if (!group.getIsPrivate()) {
+            // If it's a public group, join directly
+            group.getMembers().add(user);
+            groupRepository.save(group);
+            return toResponse(group, username);
+        }
+
+        // Private group: Create/update join request
+        GroupJoinRequest request = joinRequestRepository.findByGroupIdAndUserId(groupId, user.getId())
+                .orElseGet(() -> GroupJoinRequest.builder().group(group).user(user).build());
+
+        request.setStatus("PENDING");
+        joinRequestRepository.save(request);
+
+        return toResponse(group, username);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GroupJoinRequestResponse> getAdminJoinRequests(String adminUsername, String status) {
+        User admin = userRepository.findByUsername(adminUsername)
+                .orElseThrow(() -> new RuntimeException("Admin user not found"));
+
+        List<GroupJoinRequest> requests;
+        if (status != null && !status.isEmpty()) {
+            requests = joinRequestRepository.findByAdminIdAndStatus(admin.getId(), status.toUpperCase());
+        } else {
+            requests = joinRequestRepository.findByAdminId(admin.getId());
+        }
+
+        return requests.stream().map(r -> GroupJoinRequestResponse.builder()
+                .id(r.getId())
+                .groupId(r.getGroup().getId())
+                .groupName(r.getGroup().getName())
+                .movieTitle(r.getGroup().getMovieTitle())
+                .userId(r.getUser().getId())
+                .username(r.getUser().getUsername())
+                .status(r.getStatus())
+                .createdAt(r.getCreatedAt())
+                .build()
+        ).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public GroupJoinRequestResponse respondToJoinRequest(String adminUsername, Integer requestId, String action) {
+        User admin = userRepository.findByUsername(adminUsername)
+                .orElseThrow(() -> new RuntimeException("Admin user not found"));
+
+        GroupJoinRequest request = joinRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Join request not found"));
+
+        if (!request.getGroup().getCreatedBy().getId().equals(admin.getId())) {
+            throw new RuntimeException("Only the group creator can approve or reject join requests");
+        }
+
+        if ("APPROVE".equalsIgnoreCase(action)) {
+            request.setStatus("APPROVED");
+            request.getGroup().getMembers().add(request.getUser());
+            groupRepository.save(request.getGroup());
+        } else {
+            request.setStatus("DENIED");
+        }
+
+        GroupJoinRequest saved = joinRequestRepository.save(request);
+
+        return GroupJoinRequestResponse.builder()
+                .id(saved.getId())
+                .groupId(saved.getGroup().getId())
+                .groupName(saved.getGroup().getName())
+                .movieTitle(saved.getGroup().getMovieTitle())
+                .userId(saved.getUser().getId())
+                .username(saved.getUser().getUsername())
+                .status(saved.getStatus())
+                .createdAt(saved.getCreatedAt())
+                .build();
     }
 }
