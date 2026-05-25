@@ -64,7 +64,7 @@ class BackendApplicationTests {
 
         GroupResponse created = groupService.createGroup(ownerUsername, request);
         assertNotNull(created);
-        Integer groupId = created.getId();
+        String groupId = created.getId();
 
         // 4. Join the group with testuser
         GroupResponse joined = groupService.joinGroup(username, groupId);
