@@ -1,18 +1,64 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, LogOut, Users, ArrowLeft, MoreVertical, Shield, Hash } from 'lucide-react';
+import { Send, LogOut, Users, ArrowLeft, MoreVertical, Hash, Plus, Info } from 'lucide-react';
 import { getImageUrl } from '../services/tmdb';
+import { toast } from 'sonner';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import MovieInfoPanel from '@/components/groups/MovieInfoPanel';
+import TrendingKeywords from '@/components/groups/TrendingKeywords';
 
-interface Message { id: number; username: string; content: string; createdAt: string; }
-interface Group { id: number; name: string; movieTitle: string; moviePoster: string; focus: string; description: string; memberCount: number; }
+interface Message { 
+  id: number; 
+  username: string; 
+  content: string; 
+  createdAt: string; 
+}
+
+interface Keyword {
+  keyword: string;
+  count: number;
+}
+
+interface Member {
+  username: string;
+  fullName: string;
+  profilePicUrl: string | null;
+}
+
+interface Group { 
+  id: string; 
+  name: string; 
+  movieTitle: string; 
+  moviePoster: string; 
+  focus: string; 
+  description: string; 
+  memberCount: number; 
+  trendingKeywords?: Keyword[];
+  members?: Member[];
+  isMember?: boolean;
+}
+
 type Reactions = Record<number, Record<string, string[]>>;
 
-const EMOJIS = ['🔥', '❤️', '👏', '😂', '👍', '🎬'];
+const EMOJIS = ['👏', '🎬', '🤔', '💯'];
+
+const EMOJI_MAP: Record<string, string> = {
+  '👏': 'clap',
+  '🎬': 'film',
+  '🤔': 'thinking',
+  '💯': 'hundred'
+};
+
+const REACTION_MAP: Record<string, string> = {
+  'clap': '👏',
+  'film': '🎬',
+  'thinking': '🤔',
+  'hundred': '💯'
+};
 
 export default function GroupChat() {
   const { id } = useParams();
@@ -27,6 +73,8 @@ export default function GroupChat() {
   const [isLoading, setIsLoading] = useState(true);
   const [reactions, setReactions] = useState<Reactions>({});
   const [hoveredMsg, setHoveredMsg] = useState<number | null>(null);
+  const [movieInfo, setMovieInfo] = useState<any>(null);
+  const [showReportMenu, setShowReportMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Decode current user from JWT
@@ -48,11 +96,71 @@ export default function GroupChat() {
     const load = async () => {
       try {
         const [gRes, mRes] = await Promise.all([
-          fetch(`http://localhost:8080/api/groups/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`http://localhost:8080/api/groups/${id}/details`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`http://localhost:8080/api/groups/${id}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        if (gRes.ok) setGroup(await gRes.json());
-        if (mRes.ok) setMessages(await mRes.json());
+        if (gRes.ok) {
+          const groupData = await gRes.json();
+          setGroup(groupData);
+          
+          if (groupData.movieId) {
+            import('../services/tmdb').then(({ getMediaDetails }) => {
+              getMediaDetails(groupData.movieId.toString(), 'movie').then(data => {
+                if (data) {
+                  setMovieInfo({
+                    id: data.id,
+                    title: data.title || data.name || '',
+                    posterPath: data.poster_path,
+                    releaseDate: data.release_date || data.first_air_date,
+                    voteAverage: data.vote_average,
+                    overview: data.overview,
+                    runtime: data.runtime || (data.episode_run_time && data.episode_run_time[0]) || 0,
+                    mediaType: 'movie',
+                    imdbId: data.imdb_id || (data.external_ids && data.external_ids.imdb_id),
+                    credits: data.credits
+                  });
+                } else {
+                  getMediaDetails(groupData.movieId.toString(), 'tv').then(tvData => {
+                    if (tvData) {
+                      setMovieInfo({
+                        id: tvData.id,
+                        title: tvData.title || tvData.name || '',
+                        posterPath: tvData.poster_path,
+                        releaseDate: tvData.release_date || tvData.first_air_date,
+                        voteAverage: tvData.vote_average,
+                        overview: tvData.overview,
+                        runtime: tvData.runtime || (tvData.episode_run_time && tvData.episode_run_time[0]) || 0,
+                        mediaType: 'tv',
+                        imdbId: tvData.imdb_id || (tvData.external_ids && tvData.external_ids.imdb_id),
+                        credits: tvData.credits
+                      });
+                    }
+                  });
+                }
+              });
+            });
+          }
+        }
+        if (mRes.ok) {
+          const msgs = await mRes.json();
+          setMessages(msgs);
+
+          // Populate reactions state from backend messages
+          const reactionMap: Reactions = {};
+          msgs.forEach((m: any) => {
+            if (m.reactions) {
+              const msgReactions: Record<string, string[]> = {};
+              Object.entries(m.reactions).forEach(([type, users]) => {
+                const emoji = REACTION_MAP[type];
+                if (emoji) {
+                  msgReactions[emoji] = users as string[];
+                }
+              });
+              reactionMap[m.id] = msgReactions;
+            }
+          });
+          setReactions(reactionMap);
+        }
       } catch {} finally { setIsLoading(false); }
     };
     load();
@@ -74,8 +182,30 @@ export default function GroupChat() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ content: newMessage }),
       });
-      if (r.ok) { const sent = await r.json(); setMessages(p => [...p, sent]); setNewMessage(''); }
+      if (r.ok) { 
+        const sent = await r.json(); 
+        setMessages(p => [...p, sent]); 
+        setNewMessage(''); 
+      }
     } catch {}
+  };
+
+  const handleUnsend = async (msgId: number) => {
+    if (!confirm('Unsend this message?')) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/groups/messages/${msgId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setMessages(prev => prev.filter(m => m.id !== msgId));
+        toast.success("Message unsent.");
+      } else {
+        toast.error("Failed to unsend message.");
+      }
+    } catch {
+      toast.error("Failed to unsend message.");
+    }
   };
 
   const leaveGroup = async () => {
@@ -84,7 +214,45 @@ export default function GroupChat() {
     navigate('/groups');
   };
 
-  const toggleReaction = (msgId: number, emoji: string) => {
+  const joinGroup = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`http://localhost:8080/api/groups/${id}/join`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (r.ok) {
+        const updated = await r.json();
+        setGroup(prev => prev ? { ...prev, isMember: true, memberCount: updated.memberCount } : null);
+        // Refresh sidebar
+        fetch('http://localhost:8080/api/groups', { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.ok ? r.json() : []).then(setUserGroups).catch(console.error);
+        toast.success("Successfully joined the group! 🎉");
+      } else {
+        toast.error("Failed to join group.");
+      }
+    } catch (e) {
+      toast.error("Failed to join group.");
+    }
+  };
+
+  const handleInvite = () => {
+    if (!group) return;
+    const trends = group.trendingKeywords?.slice(0, 3).map(k => `#${k.keyword}`).join(', ');
+    const keywordText = trends ? ` We're currently discussing topics like: ${trends}.` : '';
+    const inviteLink = `${window.location.origin}/group/${group.id}`;
+    const message = `🎬 Join our discussion group "${group.name}" for "${group.movieTitle}" on CineCraftClub!${keywordText}\n\n👉 Join here: ${inviteLink}\nGroup ID: ${group.id}`;
+
+    navigator.clipboard.writeText(message)
+      .then(() => toast.success("Invite link and custom message copied to clipboard! 📋"))
+      .catch(() => toast.error("Failed to copy invite link."));
+  };
+
+  const toggleReaction = async (msgId: number, emoji: string) => {
+    const reactionType = EMOJI_MAP[emoji];
+    if (!reactionType) return;
+
+    // Optimistic Update
     setReactions(prev => {
       const currentMessageReactions = { ...(prev[msgId] || {}) };
       
@@ -108,7 +276,6 @@ export default function GroupChat() {
       const usersForCurrentEmoji = [...(currentMessageReactions[emoji] || [])];
       const currentEmojiUserIndex = usersForCurrentEmoji.indexOf(currentUser);
       if (currentEmojiUserIndex >= 0) {
-        // User already reacted with this emoji, remove it
         usersForCurrentEmoji.splice(currentEmojiUserIndex, 1);
         if (usersForCurrentEmoji.length === 0) {
           delete currentMessageReactions[emoji];
@@ -116,14 +283,27 @@ export default function GroupChat() {
           currentMessageReactions[emoji] = usersForCurrentEmoji;
         }
       } else {
-        // Add the user's reaction
         usersForCurrentEmoji.push(currentUser);
         currentMessageReactions[emoji] = usersForCurrentEmoji;
       }
 
       return { ...prev, [msgId]: currentMessageReactions };
     });
+
     setHoveredMsg(null);
+
+    try {
+      await fetch(`http://localhost:8080/api/discussions/${msgId}/reactions`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ reactionType }),
+      });
+    } catch (err) {
+      console.error("Failed to toggle reaction on backend", err);
+    }
   };
 
   if (isLoading) return <div className="h-screen flex items-center justify-center text-primary text-xl animate-pulse">Loading...</div>;
@@ -134,7 +314,7 @@ export default function GroupChat() {
       <ResizablePanelGroup orientation="horizontal" className="h-full">
         
         {/* ── LEFT SIDEBAR ── */}
-        <ResizablePanel defaultSize="25%" className="border-r border-border bg-secondary/5 hidden md:flex flex-col h-full shrink-0" id="sidebar">
+        <ResizablePanel defaultSize={20} className="border-r border-border bg-secondary/5 hidden md:flex flex-col h-full shrink-0" id="sidebar">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">My Groups</p>
           </div>
@@ -173,10 +353,10 @@ export default function GroupChat() {
           </div>
         </ResizablePanel>
 
-        <ResizableHandle withHandle />
+        <ResizableHandle withHandle id="left" />
 
         {/* ── CHAT AREA ── */}
-        <ResizablePanel defaultSize="75%" className="flex-1 flex flex-col min-w-0 h-full">
+        <ResizablePanel defaultSize={60} className="flex-1 flex flex-col min-w-0 h-full">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-secondary/10 shrink-0">
             <div className="flex items-center gap-3">
@@ -196,27 +376,51 @@ export default function GroupChat() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 relative">
               <button onClick={leaveGroup} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Leave">
                 <LogOut className="w-4 h-4" />
               </button>
-              <button className="p-2 hover:bg-secondary rounded-lg">
+              <button 
+                onClick={() => setShowReportMenu(!showReportMenu)}
+                className={`p-2 hover:bg-secondary rounded-lg transition-colors ${showReportMenu ? 'bg-secondary text-primary' : ''}`}
+                title="Options"
+              >
                 <MoreVertical className="w-4 h-4" />
               </button>
+
+              {showReportMenu && (
+                <div className="absolute right-0 top-11 w-36 bg-background border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <button
+                    onClick={() => {
+                      toast.success("Group reported successfully! 🛡️");
+                      setShowReportMenu(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors"
+                  >
+                    Report Group
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Trending Keywords display bar */}
+          <TrendingKeywords keywords={group.trendingKeywords} />
+
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-thin scrollbar-thumb-primary/20">
-            {/* Group banner */}
-            <div className="flex justify-center mb-4">
-              <div className="flex items-center gap-2 bg-secondary/40 rounded-full px-4 py-1.5 text-[11px] text-muted-foreground border border-border/30">
-                <Shield className="w-3 h-3 text-primary shrink-0" />
-                <span className="text-primary font-bold uppercase tracking-widest text-[9px]">Encrypted</span>
-                <span>·</span>
-                <span className="truncate max-w-xs">{group.description}</span>
+            {/* Movie Synopsis Banner */}
+            {movieInfo?.overview && (
+              <div className="flex justify-center mb-4">
+                <div className="bg-secondary/40 rounded-2xl px-5 py-3 text-xs text-muted-foreground border border-border/30 max-w-2xl leading-relaxed">
+                  <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>Synopsis</span>
+                  </div>
+                  <p>{movieInfo.overview}</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {messages.map(msg => {
               const isOwn = msg.username === currentUser;
@@ -235,14 +439,27 @@ export default function GroupChat() {
                     {/* Emoji picker on hover */}
                     {hoveredMsg === msg.id && (
                       <div className={`absolute -top-9 ${isOwn ? 'right-0' : 'left-0'} z-30`}>
-                        <div className="bg-secondary border border-border/60 rounded-full flex items-center px-2 py-1 gap-0.5 shadow-xl">
-                          {EMOJIS.map(e => (
-                            <button
-                              key={e}
-                              onMouseDown={ev => { ev.preventDefault(); toggleReaction(msg.id, e); }}
-                              className="text-base hover:scale-125 transition-transform px-0.5"
-                            >{e}</button>
-                          ))}
+                        <div className="bg-secondary border border-border/60 rounded-full flex items-center px-2.5 py-1 gap-1.5 shadow-xl">
+                          <div className="flex items-center gap-0.5">
+                            {EMOJIS.map(e => (
+                              <button
+                                key={e}
+                                onMouseDown={ev => { ev.preventDefault(); toggleReaction(msg.id, e); }}
+                                className="text-base hover:scale-125 transition-transform px-0.5"
+                              >{e}</button>
+                            ))}
+                          </div>
+                          {isOwn && (
+                            <>
+                              <div className="w-[1.5px] h-3.5 bg-border/80" />
+                              <button
+                                onMouseDown={ev => { ev.preventDefault(); handleUnsend(msg.id); }}
+                                className="text-[10px] font-bold text-red-500 hover:text-red-400 px-1 uppercase tracking-wider transition-colors"
+                              >
+                                Unsend
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     )}
@@ -285,26 +502,94 @@ export default function GroupChat() {
           </div>
 
           {/* Input */}
-          <div className="px-4 py-3 border-t border-border bg-background shrink-0">
-            <form onSubmit={sendMessage} className="flex items-center gap-2">
-              <div className="flex-1 relative">
-                <textarea
-                  rows={1}
-                  value={newMessage}
-                  onChange={e => setNewMessage(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  placeholder="Write a message..."
-                  className="w-full bg-secondary/40 border border-border/50 focus:border-primary focus:outline-none px-4 py-2.5 rounded-xl pr-10 resize-none text-[15px] md:text-base transition-all"
-                />
+          <div className="px-4 py-4 border-t border-border bg-background/50 shrink-0">
+            {group.isMember ? (
+              <form onSubmit={sendMessage} className="flex items-center gap-2">
+                <div className="flex-1 relative rounded-2xl border border-primary/30 focus-within:border-primary bg-secondary/30 transition-all duration-300 focus-within:shadow-[0_0_15px_rgba(224,142,31,0.2)] p-0.5">
+                  <textarea
+                    rows={1}
+                    value={newMessage}
+                    onChange={e => setNewMessage(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                    placeholder="Write a message..."
+                    className="w-full bg-transparent focus:outline-none pl-4 pr-12 py-3 rounded-2xl resize-none text-[15px] md:text-base text-foreground placeholder:text-muted-foreground/60"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all duration-300 ${
+                      newMessage.trim() 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105 hover:bg-primary/90' 
+                        : 'text-muted-foreground opacity-30 cursor-not-allowed'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-secondary/30 border border-dashed border-primary/30 p-4 rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full text-primary shrink-0 animate-pulse">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">You are not a member of this group</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Join this group to participate and write messages.</p>
+                  </div>
+                </div>
                 <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all ${newMessage.trim() ? 'text-primary' : 'text-muted-foreground opacity-30'}`}
+                  onClick={joinGroup}
+                  className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-bold text-sm transition-all hover:scale-[1.02] shrink-0"
                 >
-                  <Send className="w-4 h-4" />
+                  Join Group
                 </button>
               </div>
-            </form>
+            )}
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle id="right" />
+
+        {/* ── RIGHT SIDEBAR (Movie Info & Members) ── */}
+        <ResizablePanel defaultSize={20} className="border-l border-border bg-secondary/5 hidden lg:flex flex-col h-full shrink-0" id="right-sidebar">
+          <div className="flex-1 overflow-y-auto divide-y divide-border/20 scrollbar-none">
+            <MovieInfoPanel movieInfo={movieInfo} />
+
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-primary">
+                <Users className="w-4 h-4" />
+                <span>Members ({group.members?.length || 0})</span>
+              </div>
+              <div className="space-y-2 mb-4">
+                {group.members?.map((m: any) => (
+                  <div key={m.username} className="flex items-center gap-2 px-3 py-2 hover:bg-secondary/40 rounded-xl transition-all border border-transparent hover:border-border/30">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs uppercase overflow-hidden shrink-0">
+                      {m.profilePicUrl ? (
+                        <img src={m.profilePicUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{m.username.substring(0, 2)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-foreground truncate">{m.fullName || m.username}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">@{m.username}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Invite button */}
+              <div className="border-t border-border/30 pt-4 mt-4">
+                <button
+                  onClick={handleInvite}
+                  className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Invite Friends</span>
+                </button>
+              </div>
+            </div>
           </div>
         </ResizablePanel>
 

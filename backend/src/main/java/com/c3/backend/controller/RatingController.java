@@ -2,6 +2,7 @@ package com.c3.backend.controller;
 
 import com.c3.backend.dto.RatingRequest;
 import com.c3.backend.dto.RatingResponse;
+import com.c3.backend.dto.MovieAverageRatingResponse;
 import com.c3.backend.service.RatingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ratings")
@@ -48,5 +50,23 @@ public class RatingController {
             @PathVariable Long movieId) {
         ratingService.deleteRating(authentication.getName(), movieId);
         return ResponseEntity.ok().build();
+    }
+
+    /** Get all ratings and reviews for a movie (public) */
+    @GetMapping("/movie/{movieId}/all")
+    public ResponseEntity<List<RatingResponse>> getMovieRatings(@PathVariable Long movieId) {
+        return ResponseEntity.ok(ratingService.getMovieRatings(movieId));
+    }
+
+    /** Get the average rating and count for a movie (public) */
+    @GetMapping("/movie/{movieId}/average")
+    public ResponseEntity<MovieAverageRatingResponse> getMovieAverageRating(@PathVariable Long movieId) {
+        return ResponseEntity.ok(ratingService.getMovieAverageRating(movieId));
+    }
+
+    /** Get the average ratings for a list of movies (public) */
+    @GetMapping("/movie/averages")
+    public ResponseEntity<Map<Long, MovieAverageRatingResponse>> getAverageRatings(@RequestParam("ids") List<Long> ids) {
+        return ResponseEntity.ok(ratingService.getAverageRatings(ids));
     }
 }

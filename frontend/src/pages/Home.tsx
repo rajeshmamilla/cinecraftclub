@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, MessageSquare, TrendingUp } from 'lucide-react';
+import { Play, MessageSquare, TrendingUp, Lock, Clock, XCircle } from 'lucide-react';
 import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../services/tmdb';
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
 
 interface GroupResponse {
-  id: number;
+  id: string;
   name: string;
   movieId: number;
   movieTitle: string;
@@ -28,8 +28,37 @@ export default function Home() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
-  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
+  const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchC3Ratings = async () => {
+      const movieIds = [
+        ...trendingMovies.map(m => m.id),
+        ...teluguMovies.map(m => m.id)
+      ];
+      if (movieIds.length === 0) return;
+      try {
+        const uniqueIds = Array.from(new Set(movieIds));
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        if (res.ok) {
+          const data = await res.json();
+          const ratingsMap: Record<number, number> = {};
+          Object.entries(data).forEach(([key, val]: [string, any]) => {
+            if (val.averageRating >= 1) {
+              ratingsMap[Number(key)] = val.averageRating;
+            }
+          });
+          setC3Ratings(ratingsMap);
+        }
+      } catch (e) {
+        console.error("Failed to fetch C3 ratings map", e);
+      }
+    };
+
+    fetchC3Ratings();
+  }, [trendingMovies, teluguMovies]);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -65,10 +94,18 @@ export default function Home() {
     fetchGroups();
   }, []);
 
-  const handleGroupClick = async (group: GroupResponse) => {
+  const handleCardClick = (group: GroupResponse) => {
     const token = getValidToken();
     if (!token) {
-      // Trigger authentication modal
+      window.dispatchEvent(new Event('open-auth-modal'));
+      return;
+    }
+    navigate(`/group/${group.id}`);
+  };
+
+  const handleJoinOrRequest = async (group: GroupResponse) => {
+    const token = getValidToken();
+    if (!token) {
       window.dispatchEvent(new Event('open-auth-modal'));
       return;
     }
@@ -113,6 +150,7 @@ export default function Home() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
+        setGroups(prev => prev.map(g => g.id === group.id ? { ...g, isMember: true, memberCount: g.memberCount + 1 } : g));
         navigate(`/group/${group.id}`);
       }
     } catch (e) {
@@ -195,7 +233,7 @@ export default function Home() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
           {trendingMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
+            <MovieCard key={movie.id} movie={movie} c3Rating={c3Ratings[movie.id]} />
           ))}
         </div>
       </section>
@@ -217,7 +255,7 @@ export default function Home() {
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
           {teluguMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
+            <MovieCard key={movie.id} movie={movie} c3Rating={c3Ratings[movie.id]} />
           ))}
         </div>
       </section>
@@ -260,17 +298,25 @@ export default function Home() {
             {groups.map((group) => (
               <div
                 key={group.id}
-                onClick={() => handleGroupClick(group)}
+                onClick={() => handleCardClick(group)}
                 className="bg-secondary/50 rounded-xl p-6 border border-border hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col justify-between"
               >
                 <div>
                   <div className="text-xs text-muted-foreground mb-2 flex justify-between items-center">
-                    <span className="uppercase tracking-wider font-semibold truncate max-w-[180px]" title={group.movieTitle}>
+                    <span className="uppercase tracking-wider font-semibold truncate max-w-[150px]" title={group.movieTitle}>
                       {group.movieTitle}
                     </span>
-                    <span className="bg-background px-2.5 py-1 rounded-full shrink-0">
-                      {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-                    </span>
+                    <div className="flex items-center space-x-1.5 shrink-0">
+                      {group.isPrivate && (
+                        <span className="bg-red-500/15 text-red-500 border border-red-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1">
+                          <Lock className="w-2.5 h-2.5" />
+                          <span>Private</span>
+                        </span>
+                      )}
+                      <span className="bg-background px-2.5 py-1 rounded-full text-[11px] font-medium">
+                        {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
                   </div>
                   <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
                     {group.name}
@@ -292,13 +338,38 @@ export default function Home() {
                 <div className="flex items-center justify-between pt-4 border-t border-border/50 text-xs text-muted-foreground mt-auto">
                   <span>Created by: <span className="font-semibold text-foreground">{group.createdBy}</span></span>
                   {joiningGroupId === group.id ? (
-                    <span className="text-primary animate-pulse font-medium">Joining...</span>
+                    <span className="text-primary animate-pulse font-medium">Processing...</span>
                   ) : group.isMember ? (
                     <span className="text-green-400 font-medium flex items-center space-x-1">
                       <span>Joined</span>
                     </span>
+                  ) : group.isPrivate ? (
+                    group.joinRequestStatus === 'PENDING' ? (
+                      <span className="text-yellow-500 font-medium flex items-center space-x-1">
+                        <Clock className="w-3.5 h-3.5 animate-pulse" />
+                        <span>Pending</span>
+                      </span>
+                    ) : group.joinRequestStatus === 'DENIED' ? (
+                      <span className="text-red-500 font-medium flex items-center space-x-1">
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Denied</span>
+                      </span>
+                    ) : (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleJoinOrRequest(group); }}
+                        className="text-primary font-medium flex items-center space-x-1 hover:underline bg-transparent border-0 cursor-pointer"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Request</span>
+                      </button>
+                    )
                   ) : (
-                    <span className="text-primary font-medium group-hover:underline">Join & Chat</span>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleJoinOrRequest(group); }}
+                      className="text-primary font-medium hover:underline bg-transparent border-0 cursor-pointer"
+                    >
+                      Join & Chat
+                    </button>
                   )}
                 </div>
               </div>

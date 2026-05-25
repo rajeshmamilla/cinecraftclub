@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface ResizableContextType {
-  sidebarWidth: number;
-  setSidebarWidth: (width: number) => void;
-  isDragging: boolean;
-  setIsDragging: (dragging: boolean) => void;
+  leftWidth: number;
+  setLeftWidth: (width: number) => void;
+  rightWidth: number;
+  setRightWidth: (width: number) => void;
+  activeHandle: 'left' | 'right' | null;
+  setActiveHandle: (handle: 'left' | 'right' | null) => void;
 }
 
 const ResizableContext = createContext<ResizableContextType | undefined>(undefined);
@@ -17,11 +19,12 @@ export function ResizablePanelGroup({
   orientation?: 'horizontal' | 'vertical';
   className?: string;
 }) {
-  const [sidebarWidth, setSidebarWidth] = useState(280); // Default elegant width for sidebar
-  const [isDragging, setIsDragging] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(280); // Default size for left side bar (My Groups)
+  const [rightWidth, setRightWidth] = useState(340); // Default size for right side bar (Movie Metadata)
+  const [activeHandle, setActiveHandle] = useState<'left' | 'right' | null>(null);
 
   return (
-    <ResizableContext.Provider value={{ sidebarWidth, setSidebarWidth, isDragging, setIsDragging }}>
+    <ResizableContext.Provider value={{ leftWidth, setLeftWidth, rightWidth, setRightWidth, activeHandle, setActiveHandle }}>
       <div className={`flex w-full h-full select-none ${className}`}>
         {children}
       </div>
@@ -31,7 +34,6 @@ export function ResizablePanelGroup({
 
 export function ResizablePanel({
   children,
-  defaultSize,
   className = '',
   id,
 }: {
@@ -45,13 +47,21 @@ export function ResizablePanel({
     throw new Error('ResizablePanel must be used within a ResizablePanelGroup');
   }
 
-  // Treat as sidebar if it has defaultSize around 25% or specifically marked
-  const isSidebar = defaultSize === '25%' || defaultSize === 25 || id === 'sidebar' || className.includes('sidebar') || !className.includes('flex-1');
-
-  if (isSidebar) {
+  if (id === 'sidebar') {
     return (
       <div
-        style={{ width: `${context.sidebarWidth}px` }}
+        style={{ width: `${context.leftWidth}px` }}
+        className={`shrink-0 overflow-hidden flex flex-col h-full ${className}`}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  if (id === 'right-sidebar') {
+    return (
+      <div
+        style={{ width: `${context.rightWidth}px` }}
         className={`shrink-0 overflow-hidden flex flex-col h-full ${className}`}
       >
         {children}
@@ -69,29 +79,35 @@ export function ResizablePanel({
 export function ResizableHandle({
   withHandle,
   className = '',
+  id,
 }: {
   withHandle?: boolean;
   className?: string;
+  id?: 'left' | 'right';
 }) {
   const context = useContext(ResizableContext);
   if (!context) {
     throw new Error('ResizableHandle must be used within a ResizablePanelGroup');
   }
 
-  const { setSidebarWidth, isDragging, setIsDragging } = context;
-  const handleRef = useRef<HTMLDivElement>(null);
+  const { setLeftWidth, setRightWidth, activeHandle, setActiveHandle } = context;
+  const isDragging = activeHandle === id;
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging || !id) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      // Dynamic resizable bounds: min 220px, max 480px
-      const newWidth = Math.max(220, Math.min(480, e.clientX));
-      setSidebarWidth(newWidth);
+      if (id === 'left') {
+        const newWidth = Math.max(200, Math.min(450, e.clientX));
+        setLeftWidth(newWidth);
+      } else if (id === 'right') {
+        const newWidth = Math.max(240, Math.min(500, window.innerWidth - e.clientX));
+        setRightWidth(newWidth);
+      }
     };
 
     const handleMouseUp = () => {
-      setIsDragging(false);
+      setActiveHandle(null);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -101,12 +117,11 @@ export function ResizableHandle({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, setSidebarWidth, setIsDragging]);
+  }, [isDragging, id, setLeftWidth, setRightWidth, setActiveHandle]);
 
   return (
     <div
-      ref={handleRef}
-      onMouseDown={() => setIsDragging(true)}
+      onMouseDown={() => id && setActiveHandle(id)}
       className={`w-[3px] hover:w-[6px] bg-border hover:bg-primary/50 cursor-col-resize transition-all duration-200 relative flex items-center justify-center z-50 ${
         isDragging ? 'bg-primary w-[6px]' : ''
       } ${className}`}

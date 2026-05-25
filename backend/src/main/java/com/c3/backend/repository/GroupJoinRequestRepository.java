@@ -12,7 +12,7 @@ import java.util.Optional;
 @Repository
 public interface GroupJoinRequestRepository extends JpaRepository<GroupJoinRequest, Integer> {
 
-    Optional<GroupJoinRequest> findByGroupIdAndUserId(Integer groupId, Long userId);
+    Optional<GroupJoinRequest> findByGroupIdAndUserId(String groupId, Long userId);
 
     List<GroupJoinRequest> findByUserId(Long userId);
 

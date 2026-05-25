@@ -6,7 +6,11 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+import java.time.ZonedDateTime;
+import java.util.List;
+
 @Repository
 public interface GroupMessageRepository extends JpaRepository<GroupMessage, Integer> {
-    List<GroupMessage> findByGroupIdOrderByCreatedAtAsc(Integer groupId);
+    List<GroupMessage> findByGroupIdOrderByCreatedAtAsc(String groupId);
+    List<GroupMessage> findByGroupIdAndCreatedAtAfter(String groupId, ZonedDateTime dateTime);
 }

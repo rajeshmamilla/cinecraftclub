@@ -8,12 +8,39 @@ import { getValidToken } from '../../utils/auth';
 
 interface MovieCardProps {
   movie: Movie;
+  c3Rating?: number;
 }
 
-export default function MovieCard({ movie }: MovieCardProps) {
+export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
   const navigate = useNavigate();
   const [inWatchlist, setInWatchlist] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [c3RatingState, setC3RatingState] = useState<number | undefined>(undefined);
+
+  // If c3Rating is passed as a prop, use it; otherwise fetch it
+  const currentC3Rating = c3Rating !== undefined ? c3Rating : c3RatingState;
+
+  useEffect(() => {
+    if (c3Rating !== undefined) return;
+
+    const fetchAverageRating = async () => {
+      try {
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/${movie.id}/average`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.averageRating >= 1) {
+            setC3RatingState(data.averageRating);
+          } else {
+            setC3RatingState(0);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch average rating", e);
+      }
+    };
+
+    fetchAverageRating();
+  }, [movie.id, c3Rating]);
 
   useEffect(() => {
     const checkWatchlist = async () => {
@@ -140,9 +167,17 @@ export default function MovieCard({ movie }: MovieCardProps) {
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4 z-10">
           <h3 className="font-semibold text-white text-sm line-clamp-2 mb-1">{movie.title || movie.name}</h3>
-          <div className="flex items-center space-x-1 text-yellow-400">
-            <Star className="w-4 h-4 fill-current" />
-            <span className="text-xs font-medium">{movie.vote_average?.toFixed(1)}</span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center space-x-1 text-yellow-400">
+              <Star className="w-4 h-4 fill-current" />
+              <span className="text-xs font-medium">{movie.vote_average?.toFixed(1)}</span>
+            </div>
+            {currentC3Rating !== undefined && currentC3Rating >= 1 && (
+              <div className="flex items-center space-x-1 px-1.5 py-0.5 rounded bg-blue-600/20 border border-blue-400/40 text-blue-400 text-[10px] font-bold">
+                <span>C3</span>
+                <span>{currentC3Rating.toFixed(1)}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

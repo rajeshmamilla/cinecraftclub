@@ -34,7 +34,13 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        Map<String, Object> extraClaims = new HashMap<>();
+        if (userDetails instanceof CustomUserDetails) {
+            com.c3.backend.model.User user = ((CustomUserDetails) userDetails).getUser();
+            extraClaims.put("email", user.getEmail());
+            extraClaims.put("emailVerified", user.getEmailVerified() != null ? user.getEmailVerified() : false);
+        }
+        return generateToken(extraClaims, userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {

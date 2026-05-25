@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @Data
 @Builder
 public class GroupResponse {
-    private Integer id;
+    private String id;
     private String name;
     private Integer movieId;
     private String movieTitle;

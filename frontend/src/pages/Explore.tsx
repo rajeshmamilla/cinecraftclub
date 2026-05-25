@@ -11,6 +11,31 @@ export default function Explore() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    const movieIds = movies.map(m => m.id);
+    if (movieIds.length === 0) return;
+    const fetchC3Ratings = async () => {
+      try {
+        const uniqueIds = Array.from(new Set(movieIds));
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        if (res.ok) {
+          const data = await res.json();
+          const ratingsMap: Record<number, number> = {};
+          Object.entries(data).forEach(([key, val]: [string, any]) => {
+            if (val.averageRating >= 1) {
+              ratingsMap[Number(key)] = val.averageRating;
+            }
+          });
+          setC3Ratings(ratingsMap);
+        }
+      } catch (e) {
+        console.error("Failed to fetch C3 ratings map for Explore page", e);
+      }
+    };
+    fetchC3Ratings();
+  }, [movies]);
   
   const isTrending = category === 'trending';
   const title = isTrending ? 'Trending Globally' : 'Popular in Telugu Cinema';
@@ -60,7 +85,7 @@ export default function Explore() {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
         {movies.map((movie, idx) => (
-          <MovieCard key={`${movie.id}-${idx}`} movie={movie} />
+          <MovieCard key={`${movie.id}-${idx}`} movie={movie} c3Rating={c3Ratings[movie.id]} />
         ))}
       </div>
 

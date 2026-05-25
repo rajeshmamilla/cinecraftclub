@@ -93,6 +93,30 @@ export default function RatingModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to remove your rating?')) return;
+    const token = getValidToken();
+    if (!token) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`http://localhost:8080/api/ratings/movie/${movieId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Rating removed successfully.');
+        onSuccess?.(0);
+        onClose();
+      } else {
+        toast.error('Failed to remove rating.');
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current) onClose();
   };
@@ -163,15 +187,27 @@ export default function RatingModal({
           />
         </div>
 
-        {/* Submit */}
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting || selectedStar === 0}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          <Star className={`w-4 h-4 ${selectedStar > 0 ? 'fill-current' : ''}`} />
-          {isSubmitting ? 'Saving...' : existingRatingId ? 'Update Rating' : 'Submit Rating'}
-        </button>
+        {/* Actions */}
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || selectedStar === 0}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <Star className={`w-4 h-4 ${selectedStar > 0 ? 'fill-current' : ''}`} />
+            {isSubmitting ? 'Saving...' : existingRatingId ? 'Update Rating' : 'Submit Rating'}
+          </button>
+          
+          {existingRatingId && (
+            <button
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-bold py-2.5 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm border border-red-500/20"
+            >
+              Remove Rating
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

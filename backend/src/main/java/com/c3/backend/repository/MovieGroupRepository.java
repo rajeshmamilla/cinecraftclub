@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface MovieGroupRepository extends JpaRepository<MovieGroup, Integer> {
+public interface MovieGroupRepository extends JpaRepository<MovieGroup, String> {
 
     @Query("SELECT g FROM MovieGroup g JOIN g.members m WHERE m.id = :userId")
     List<MovieGroup> findByMembersId(@Param("userId") Long userId);

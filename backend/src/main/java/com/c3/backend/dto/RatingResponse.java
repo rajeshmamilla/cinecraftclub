@@ -7,7 +7,7 @@ import java.time.ZonedDateTime;
 @Data
 @Builder
 public class RatingResponse {
-    private Long id;
+    private Integer id;
     private Long movieId;
     private String mediaType;
     private String movieTitle;
@@ -16,4 +16,7 @@ public class RatingResponse {
     private String review;
     private ZonedDateTime createdAt;
     private ZonedDateTime updatedAt;
+    private String username;
+    private String userFullName;
+    private String userProfilePicUrl;
 }

@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.ZonedDateTime;
 import java.util.HashSet;
@@ -20,8 +22,7 @@ import java.util.Set;
 public class MovieGroup {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private String id;
 
     @Column(nullable = false)
     private String name;
@@ -38,6 +39,13 @@ public class MovieGroup {
     private String focus;
     
     private String keywords;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "trending_keywords", columnDefinition = "jsonb")
+    private String trendingKeywords;
+
+    @Column(name = "keywords_updated_at")
+    private ZonedDateTime keywordsUpdatedAt;
 
     @Column(columnDefinition = "TEXT")
     private String description;

@@ -4,6 +4,7 @@ import com.c3.backend.dto.GroupJoinRequestResponse;
 import com.c3.backend.dto.GroupMessageResponse;
 import com.c3.backend.dto.GroupRequest;
 import com.c3.backend.dto.GroupResponse;
+import com.c3.backend.dto.GroupDetailsResponse;
 import com.c3.backend.dto.MessageRequest;
 import com.c3.backend.service.GroupService;
 import lombok.RequiredArgsConstructor;
@@ -57,22 +58,29 @@ public class GroupController {
 
     @GetMapping("/{groupId}")
     public ResponseEntity<GroupResponse> getGroupDetails(
-            @PathVariable Integer groupId,
+            @PathVariable String groupId,
             Authentication authentication) {
         return ResponseEntity.ok(groupService.getGroupDetails(groupId, resolveUsername(authentication)));
+    }
+
+    @GetMapping("/{groupId}/details")
+    public ResponseEntity<GroupDetailsResponse> getDetailedGroup(
+            @PathVariable String groupId,
+            Authentication authentication) {
+        return ResponseEntity.ok(groupService.getDetailedGroup(groupId, resolveUsername(authentication)));
     }
 
     @PostMapping("/{groupId}/join")
     public ResponseEntity<GroupResponse> joinGroup(
             Authentication authentication,
-            @PathVariable Integer groupId) {
+            @PathVariable String groupId) {
         return ResponseEntity.ok(groupService.joinGroup(authentication.getName(), groupId));
     }
 
     @PostMapping("/{groupId}/request")
     public ResponseEntity<GroupResponse> requestToJoinGroup(
             Authentication authentication,
-            @PathVariable Integer groupId) {
+            @PathVariable String groupId) {
         return ResponseEntity.ok(groupService.requestToJoinGroup(authentication.getName(), groupId));
     }
 
@@ -94,7 +102,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}/leave")
     public ResponseEntity<?> leaveGroup(
             Authentication authentication,
-            @PathVariable Integer groupId) {
+            @PathVariable String groupId) {
         groupService.leaveGroup(authentication.getName(), groupId);
         return ResponseEntity.ok().build();
     }
@@ -102,15 +110,23 @@ public class GroupController {
     @GetMapping("/{groupId}/messages")
     public ResponseEntity<List<GroupMessageResponse>> getMessages(
             Authentication authentication,
-            @PathVariable Integer groupId) {
+            @PathVariable String groupId) {
         return ResponseEntity.ok(groupService.getGroupMessages(authentication.getName(), groupId));
     }
 
     @PostMapping("/{groupId}/messages")
     public ResponseEntity<GroupMessageResponse> sendMessage(
             Authentication authentication,
-            @PathVariable Integer groupId,
+            @PathVariable String groupId,
             @RequestBody MessageRequest request) {
         return ResponseEntity.ok(groupService.sendMessage(authentication.getName(), groupId, request.getContent()));
+    }
+
+    @DeleteMapping("/messages/{messageId}")
+    public ResponseEntity<Void> deleteMessage(
+            Authentication authentication,
+            @PathVariable Integer messageId) {
+        groupService.deleteMessage(authentication.getName(), messageId);
+        return ResponseEntity.ok().build();
     }
 }

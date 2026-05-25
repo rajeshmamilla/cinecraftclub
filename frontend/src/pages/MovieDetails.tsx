@@ -1,14 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock } from 'lucide-react';
+import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film } from 'lucide-react';
 import { toast } from 'sonner';
-import { getMediaDetails, getImageUrl } from '../services/tmdb';
-import type { MovieDetails as MovieDetailsType } from '../services/tmdb';
+import { getMediaDetails, getImageUrl, getRecommendations } from '../services/tmdb';
+import type { MovieDetails as MovieDetailsType, Movie } from '../services/tmdb';
+
+interface Review {
+  id: number;
+  movieId: number;
+  mediaType: string;
+  movieTitle: string;
+  posterPath: string;
+  rating: number;
+  review: string;
+  createdAt: string;
+  updatedAt: string;
+  username: string;
+  userFullName: string | null;
+  userProfilePicUrl: string | null;
+}
 import { getValidToken } from '../utils/auth';
 import RatingModal from '../components/movie/RatingModal';
+import MovieCard from '../components/movie/MovieCard';
 
 interface GroupResponse {
-  id: number;
+  id: string;
   name: string;
   focus: string;
   keywords: string;
@@ -18,6 +34,22 @@ interface GroupResponse {
   createdBy: string;
 }
 
+const formatReviewDate = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    const diffTime = Math.abs(Date.now() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays <= 1) return 'Today';
+    if (diffDays === 2) return '1 day ago';
+    if (diffDays < 7) return `${diffDays - 1} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return 'Recently';
+  }
+};
+
+
 export default function MovieDetails() {
   const { type, id } = useParams<{ type: string; id: string }>();
   const navigate = useNavigate();
@@ -25,17 +57,67 @@ export default function MovieDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState<Movie[]>([]);
+  const [recsLoading, setRecsLoading] = useState(true);
 
   // Groups state
   const [groups, setGroups] = useState<GroupResponse[]>([]);
-  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
 
   // Watchlist state
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
 
+  // Reviews state
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsTrigger, setReviewsTrigger] = useState(0);
+  const [c3AverageRating, setC3AverageRating] = useState<number>(0);
+  const [c3RecRatings, setC3RecRatings] = useState<Record<number, number>>({});
+
   const token = getValidToken();
+
+  useEffect(() => {
+    const fetchC3Average = async () => {
+      if (id) {
+        try {
+          const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}/average?t=${Date.now()}`);
+          if (res.ok) {
+            const data = await res.json();
+            setC3AverageRating(data.averageRating ?? 0);
+          }
+        } catch (e) {
+          console.error("Failed to fetch C3 average rating", e);
+        }
+      }
+    };
+    fetchC3Average();
+  }, [id, reviewsTrigger]);
+
+  useEffect(() => {
+    const movieIds = recommendations.map(m => m.id);
+    if (movieIds.length === 0) return;
+    const fetchC3RecRatings = async () => {
+      try {
+        const uniqueIds = Array.from(new Set(movieIds));
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        if (res.ok) {
+          const data = await res.json();
+          const ratingsMap: Record<number, number> = {};
+          Object.entries(data).forEach(([key, val]: [string, any]) => {
+            if (val.averageRating >= 1) {
+              ratingsMap[Number(key)] = val.averageRating;
+            }
+          });
+          setC3RecRatings(ratingsMap);
+        }
+      } catch (e) {
+        console.error("Failed to fetch C3 ratings map for recommendations", e);
+      }
+    };
+    fetchC3RecRatings();
+  }, [recommendations]);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -46,8 +128,45 @@ export default function MovieDetails() {
         setIsLoading(false);
       }
     };
+    const fetchRecs = async () => {
+      if (id && type) {
+        setRecsLoading(true);
+        try {
+          const data = await getRecommendations(id, type as 'movie' | 'tv');
+          const mapped = data.map(item => ({
+            ...item,
+            media_type: item.media_type || (type as 'movie' | 'tv')
+          }));
+          setRecommendations(mapped.slice(0, 6));
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setRecsLoading(false);
+        }
+      }
+    };
+    const fetchReviews = async () => {
+      if (id) {
+        setReviewsLoading(true);
+        try {
+          const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}/all?t=${Date.now()}`);
+          if (res.ok) {
+            const data = await res.json();
+            // Filter only ratings that actually have a written review
+            const withReviews = data.filter((r: any) => r.review && r.review.trim() !== "");
+            setReviews(withReviews);
+          }
+        } catch (e) {
+          console.error("Failed to fetch reviews for movie details page", e);
+        } finally {
+          setReviewsLoading(false);
+        }
+      }
+    };
     fetchDetails();
-  }, [id, type]);
+    fetchRecs();
+    fetchReviews();
+  }, [id, type, reviewsTrigger]);
 
   // Fetch real groups for this movie (include auth token so isMember is accurate)
   useEffect(() => {
@@ -87,6 +206,27 @@ export default function MovieDetails() {
     check();
   }, [id, token]);
 
+  // Fetch user's rating for this movie
+  useEffect(() => {
+    if (!id || !token) { setUserRating(0); return; }
+    const fetchRating = async () => {
+      try {
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok && res.status !== 204) {
+          const data = await res.json();
+          setUserRating(data.rating ?? 0);
+        } else {
+          setUserRating(0);
+        }
+      } catch (e) {
+        console.error("Failed to fetch user rating", e);
+      }
+    };
+    fetchRating();
+  }, [id, token, reviewsTrigger]);
+
   const toggleWatchlist = async () => {
     if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
     const prev = inWatchlist;
@@ -118,7 +258,7 @@ export default function MovieDetails() {
     } catch (e) { setInWatchlist(prev); toast.error('Something went wrong.'); }
   };
 
-  const handleJoinGroup = async (groupId: number) => {
+  const handleJoinGroup = async (groupId: string) => {
     if (!token) {
       navigate('/'); // Redirect to auth
       return;
@@ -141,7 +281,7 @@ export default function MovieDetails() {
     }
   };
 
-  const handleOpenGroup = (groupId: number) => {
+  const handleOpenGroup = (groupId: string) => {
     if (!token) {
       navigate('/');
       return;
@@ -182,7 +322,10 @@ export default function MovieDetails() {
         mediaType={type || 'movie'}
         movieTitle={movie.title || movie.name || ''}
         posterPath={movie.poster_path || ''}
-        onSuccess={(r) => setUserRating(r)}
+        onSuccess={(r) => {
+          setUserRating(r);
+          setReviewsTrigger(prev => prev + 1);
+        }}
       />
 
       <section className="relative w-full">
@@ -215,13 +358,13 @@ export default function MovieDetails() {
                 </div>
               )}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
-                <h1 className="text-4xl md:text-6xl font-bold drop-shadow-md">
+                <h1 className="text-4xl md:text-6xl font-bold drop-shadow-md text-left">
                   {movie.title || movie.name} <span className="text-2xl text-muted-foreground font-normal">({(movie.release_date || movie.first_air_date || '').substring(0, 4)})</span>
                 </h1>
                 <button
                   onClick={toggleWatchlist}
                   disabled={watchlistLoading}
-                  className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-full border transition-all group ${
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-full border transition-all group shrink-0 ${
                     inWatchlist
                       ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-secondary/80 hover:bg-secondary border-border'
@@ -242,6 +385,15 @@ export default function MovieDetails() {
                   <Star className="w-5 h-5 text-yellow-400 fill-current" />
                   <span className="font-bold text-foreground text-base">{movie.vote_average.toFixed(1)}</span>
                 </div>
+                {c3AverageRating >= 1 && (
+                  <>
+                    <div className="w-1 h-1 bg-border rounded-full" />
+                    <div className="flex items-center space-x-1.5 px-3 py-1 rounded-full border border-blue-400/30 bg-blue-600/15 text-blue-400 font-bold">
+                      <span className="text-xs uppercase tracking-wider text-blue-300">C3:</span>
+                      <span className="text-foreground text-sm font-black">{c3AverageRating.toFixed(1)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="w-1 h-1 bg-border rounded-full" />
                 <div className="flex items-center space-x-1">
                   <Clock className="w-4 h-4" />
@@ -271,6 +423,14 @@ export default function MovieDetails() {
                     </button>
                   </>
                 )}
+                <div className="w-1 h-1 bg-border rounded-full" />
+                <button
+                  onClick={() => token ? navigate('/dashboard?tab=groups') : navigate('/')}
+                  className="flex items-center space-x-1.5 px-3 py-1 rounded-full border border-border bg-secondary/80 hover:bg-secondary text-foreground hover:text-primary hover:border-primary transition-all font-semibold text-sm group"
+                >
+                  <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <span>Create Discussion</span>
+                </button>
               </div>
 
               <div className="flex flex-wrap gap-2 mb-6 justify-center md:justify-start">
@@ -294,58 +454,86 @@ export default function MovieDetails() {
         {/* Main Content (Cast, Crew) */}
         <div className="lg:col-span-2 space-y-12">
 
-          {/* Community Experiences */}
+          {/* Recent Ratings & Reviews */}
           <section className="bg-secondary/30 border border-border p-6 rounded-2xl">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold flex items-center space-x-2">
-                <MessageSquare className="w-6 h-6 text-primary" />
-                <span>Community Experiences</span>
+                <Star className="w-6 h-6 text-primary" />
+                <span>Recent Ratings & Reviews</span>
               </h3>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-background/50 border border-border rounded-xl p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm">Alex Cinephile</h4>
-                      <p className="text-xs text-muted-foreground">2 days ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 bg-yellow-400/10 px-2 py-1 rounded">
-                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                    <span className="text-sm font-bold text-yellow-400">5/5</span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Absolutely mind-blowing visually. The pacing in the second half really pulls everything together. The background score elevated the entire experience. Highly recommend watching this on the biggest screen possible!
-                </p>
+            {reviewsLoading ? (
+              <div className="space-y-4">
+                {[1, 2].map(i => (
+                  <div key={i} className="bg-background/50 border border-border rounded-xl p-5 animate-pulse h-32" />
+                ))}
               </div>
-
-              <div className="bg-background/50 border border-border rounded-xl p-5">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
+            ) : (
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin">
+                {(reviews.length > 0 ? reviews : [
+                  {
+                    id: 99991,
+                    movieId: Number(id),
+                    mediaType: type || 'movie',
+                    movieTitle: movie.title || movie.name || '',
+                    posterPath: movie.poster_path || '',
+                    rating: movie.vote_average ? Math.round(movie.vote_average) : 9,
+                    review: `Absolutely mind-blowing visually. The pacing in the second half really pulls everything together. The background score elevated the entire experience for "${movie.title || movie.name}". Highly recommend watching this on the biggest screen possible!`,
+                    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+                    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+                    username: 'alex_cinephile',
+                    userFullName: 'Alex Cinephile',
+                    userProfilePicUrl: null
+                  },
+                  {
+                    id: 99992,
+                    movieId: Number(id),
+                    mediaType: type || 'movie',
+                    movieTitle: movie.title || movie.name || '',
+                    posterPath: movie.poster_path || '',
+                    rating: movie.vote_average ? Math.max(1, Math.round(movie.vote_average) - 1) : 8,
+                    review: `Great performances all around in "${movie.title || movie.name}". The screenplay felt a bit dragged during the initial setup, but the payoff at the end was completely worth it. Highly recommend for any craft enthusiast.`,
+                    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    username: 'moviebuff99',
+                    userFullName: 'MovieBuff99',
+                    userProfilePicUrl: null
+                  }
+                ]).slice(0, 5).map((rev) => {
+                  const rating = rev.rating;
+                  const avatar = rev.userProfilePicUrl;
+                  return (
+                    <div key={rev.id} className="bg-background/50 border border-border rounded-xl p-5 transition-all hover:bg-secondary/15">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden shrink-0">
+                            {avatar ? (
+                              <img src={avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <User className="w-5 h-5 text-primary" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-sm text-foreground">{rev.userFullName || rev.username || 'Anonymous'}</h4>
+                            <p className="text-xs text-muted-foreground">{formatReviewDate(rev.createdAt)}</p>
+                          </div>
+                        </div>
+                        {rating !== null && rating !== undefined && (
+                          <div className="flex items-center space-x-1 bg-yellow-400/10 px-2.5 py-1 rounded-lg border border-yellow-400/20">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-xs font-black text-yellow-400">{rating}/10</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs md:text-sm text-muted-foreground leading-relaxed whitespace-pre-line line-clamp-4 hover:line-clamp-none transition-all duration-300 cursor-pointer">
+                        {rev.review}
+                      </p>
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-sm">MovieBuff99</h4>
-                      <p className="text-xs text-muted-foreground">1 week ago</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-1 bg-yellow-400/10 px-2 py-1 rounded">
-                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                    <span className="text-sm font-bold text-yellow-400">4/5</span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Great performances all around. The screenplay felt a bit dragged during the initial setup, but the payoff at the end was completely worth it.
-                </p>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </section>
 
           {/* Cast */}
@@ -525,18 +713,32 @@ export default function MovieDetails() {
               ))}
             </div>
           )}
-
-          {/* Create New Group CTA */}
-          <button
-            onClick={() => token ? navigate('/dashboard?tab=groups') : navigate('/')}
-            className="w-full py-3 border border-dashed border-primary/40 text-primary rounded-xl font-medium hover:bg-primary/5 hover:border-primary transition-colors flex items-center justify-center space-x-2 text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Discussion</span>
-          </button>
         </div>
 
       </div>
+
+      {/* TMDB Recommendations Section */}
+      {recommendations.length > 0 && (
+        <section className="container mx-auto px-4 mt-16 pt-12 border-t border-border/40">
+          <div className="flex items-center space-x-2 mb-8">
+            <Film className="text-primary w-6 h-6" />
+            <h3 className="text-2xl font-bold">More Like This</h3>
+          </div>
+          {recsLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="bg-secondary/30 border border-border rounded-xl h-64 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6 animate-in fade-in duration-500">
+              {recommendations.map(recMovie => (
+                <MovieCard key={recMovie.id} movie={recMovie} c3Rating={c3RecRatings[recMovie.id]} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

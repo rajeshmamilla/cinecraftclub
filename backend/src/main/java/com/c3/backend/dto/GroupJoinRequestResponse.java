@@ -8,7 +8,7 @@ import java.time.ZonedDateTime;
 @Builder
 public class GroupJoinRequestResponse {
     private Integer id;
-    private Integer groupId;
+    private String groupId;
     private String groupName;
     private String movieTitle;
     private Long userId;

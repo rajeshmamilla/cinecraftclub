@@ -2,6 +2,7 @@ package com.c3.backend.service;
 
 import com.c3.backend.dto.RatingRequest;
 import com.c3.backend.dto.RatingResponse;
+import com.c3.backend.dto.MovieAverageRatingResponse;
 import com.c3.backend.model.MovieRating;
 import com.c3.backend.model.User;
 import com.c3.backend.repository.MovieRatingRepository;
@@ -12,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +36,9 @@ public class RatingService {
                 .review(r.getReview())
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
+                .username(r.getUser() != null ? r.getUser().getUsername() : null)
+                .userFullName(r.getUser() != null ? r.getUser().getFullName() : null)
+                .userProfilePicUrl(r.getUser() != null ? r.getUser().getProfilePicUrl() : null)
                 .build();
     }
 
@@ -81,5 +88,39 @@ public class RatingService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         ratingRepository.findByUserIdAndMovieId(user.getId(), movieId)
                 .ifPresent(ratingRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RatingResponse> getMovieRatings(Long movieId) {
+        return ratingRepository.findByMovieIdOrderByUpdatedAtDesc(movieId)
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public MovieAverageRatingResponse getMovieAverageRating(Long movieId) {
+        List<Object[]> results = ratingRepository.getAverageRatingByMovieId(movieId);
+        if (results == null || results.isEmpty()) {
+            return new MovieAverageRatingResponse(0.0, 0L);
+        }
+        Object[] row = results.get(0);
+        Double average = row[0] != null ? ((Number) row[0]).doubleValue() : 0.0;
+        Long count = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+        return new MovieAverageRatingResponse(average, count);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, MovieAverageRatingResponse> getAverageRatings(List<Long> movieIds) {
+        if (movieIds == null || movieIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Object[]> results = ratingRepository.getAverageRatingsForMovies(movieIds);
+        Map<Long, MovieAverageRatingResponse> resultMap = new HashMap<>();
+        for (Object[] row : results) {
+            Long movieId = (Long) row[0];
+            Double average = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            Long count = row[2] != null ? ((Number) row[2]).longValue() : 0L;
+            resultMap.put(movieId, new MovieAverageRatingResponse(average, count));
+        }
+        return resultMap;
     }
 }

@@ -5,7 +5,7 @@ import { getImageUrl } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
 
 interface GroupResponse {
-  id: number;
+  id: string;
   name: string;
   movieId: number;
   movieTitle: string;
@@ -28,14 +28,14 @@ export default function GroupsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFocus, setSelectedFocus] = useState('All');
-  const [joiningGroupId, setJoiningGroupId] = useState<number | null>(null);
+  const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
 
   const token = getValidToken();
 
   useEffect(() => {
-    const fetchGroups = async () => {
+    const fetchGroups = async (showSkeleton = true) => {
       const token = getValidToken(); // always read fresh
-      setIsLoading(true);
+      if (showSkeleton) setIsLoading(true);
       try {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -44,19 +44,19 @@ export default function GroupsPage() {
       } catch (e) {
         console.error(e);
       } finally {
-        setIsLoading(false);
+        if (showSkeleton) setIsLoading(false);
       }
     };
 
-    fetchGroups();
+    fetchGroups(true);
 
-    // Re-fetch when user tabs back — catches join-state changes
-    const onFocus = () => fetchGroups();
+    // Re-fetch when user tabs back — catches join-state changes silently in the background
+    const onFocus = () => fetchGroups(false);
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
-  const handleJoin = async (groupId: number, e: React.MouseEvent) => {
+  const handleJoin = async (groupId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!token) { navigate('/'); return; }
     setJoiningGroupId(groupId);
@@ -74,7 +74,7 @@ export default function GroupsPage() {
     }
   };
 
-  const handleRequestToJoin = async (groupId: number, e: React.MouseEvent) => {
+  const handleRequestToJoin = async (groupId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!token) { navigate('/'); return; }
     setJoiningGroupId(groupId);
@@ -91,52 +91,45 @@ export default function GroupsPage() {
     }
   };
 
-  const handleOpen = (groupId: number) => {
+  const handleOpen = (groupId: string) => {
     if (!token) { navigate('/'); return; }
     navigate(`/group/${groupId}`);
   };
 
   const filtered = groups.filter(g => {
-    const matchSearch = !searchQuery || g.name.toLowerCase().includes(searchQuery.toLowerCase()) || g.movieTitle?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = !searchQuery || 
+      g.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      g.movieTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      g.id === searchQuery.trim();
     const matchFocus = selectedFocus === 'All' || (g.focus && g.focus.split(',').map(f => f.trim().toLowerCase()).includes(selectedFocus.toLowerCase()));
     return matchSearch && matchFocus;
   });
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-7xl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">
-            <span className="text-primary">Cinematic</span> Discussions
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Join craft-focused groups and discuss the art of filmmaking
-          </p>
+      {/* Centered Floated Searchbar and Create Group Action */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-10 border-b border-border/10 pb-6">
+        <div className="flex-1 w-full flex justify-center">
+          <div className="relative w-full max-w-md shadow-lg shadow-primary/5 rounded-2xl overflow-hidden border border-border bg-secondary/20 focus-within:border-primary/50 transition-all">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search groups by name, movie, or ID..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent focus:outline-none pl-11 pr-4 py-2.5 text-sm transition-colors placeholder:text-muted-foreground/55 text-foreground"
+            />
+          </div>
         </div>
         {token && (
           <button
             onClick={() => navigate('/dashboard?tab=groups')}
-            className="flex items-center space-x-2 bg-primary text-primary-foreground px-5 py-3 rounded-xl font-bold hover:bg-primary/90 transition-all hover:scale-105 shrink-0"
+            className="flex items-center space-x-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-bold hover:bg-primary/90 transition-all hover:scale-105 shrink-0 text-sm shadow-md shadow-primary/25"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             <span>Create Group</span>
           </button>
         )}
-      </div>
-
-      {/* Search & Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search by group name or movie..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-secondary/40 border border-border focus:border-primary focus:outline-none pl-11 pr-4 py-3 rounded-xl transition-colors"
-          />
-        </div>
       </div>
 
       {/* Focus Filter Chips */}
@@ -192,11 +185,14 @@ export default function GroupsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(group => (
+          {filtered.map((group, index) => (
             <div
               key={group.id}
               onClick={() => handleOpen(group.id)}
-              className="bg-secondary/30 border border-border rounded-2xl overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col"
+              style={{
+                animationDelay: `${index * 60}ms`,
+              }}
+              className="bg-secondary/30 border border-border rounded-2xl overflow-hidden hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col animate-float-in"
             >
               {/* Movie Poster Banner */}
               <div className="relative h-32 overflow-hidden">

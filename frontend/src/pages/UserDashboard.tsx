@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Bookmark, Star, Users, Settings, LogOut, Plus, MessageSquare, Clock, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import WatchlistListItem from '../components/movie/WatchlistListItem';
 import CreateGroupModal from '../components/groups/CreateGroupModal';
+import VerificationModal from '../components/profile/VerificationModal';
+import ChangeUsernameModal from '../components/profile/ChangeUsernameModal';
 import { getImageUrl } from '../services/tmdb';
 
 export default function UserDashboard() {
@@ -19,6 +22,12 @@ export default function UserDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
+  // Email and Username states
+  const [email, setEmail] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
+
   useEffect(() => {
     // Extract token from URL if redirected from OAuth2
     const queryParams = new URLSearchParams(location.search);
@@ -32,6 +41,27 @@ export default function UserDashboard() {
       setToken(urlToken);
       // Clean up URL
       window.history.replaceState({}, document.title, "/dashboard");
+
+      try {
+        const payload = JSON.parse(atob(urlToken.split('.')[1]));
+        if (!payload.emailVerified) {
+          toast.warning("Email Verification Required", {
+            description: "Please verify your email under settings soon to secure your account. Redirecting you to the Home page...",
+            duration: 5000
+          });
+          setTimeout(() => {
+            navigate('/');
+          }, 3000);
+          return;
+        } else {
+          toast.success(`Welcome back, ${payload.sub || "User"}!`);
+        }
+      } catch (e) {
+        console.error("Error handling Google OAuth post-login redirect", e);
+      }
+
+      navigate('/');
+      return;
     } else {
       const storedToken = localStorage.getItem('jwtToken');
       if (!storedToken) {
@@ -51,13 +81,20 @@ export default function UserDashboard() {
     
     const fetchData = async () => {
       try {
-        const [wlRes, grRes, reqRes, ratRes] = await Promise.all([
+        const [meRes, wlRes, grRes, reqRes, ratRes] = await Promise.all([
+          fetch('http://localhost:8080/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('http://localhost:8080/api/watchlist', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('http://localhost:8080/api/groups/requests?status=PENDING', { headers: { 'Authorization': `Bearer ${token}` } }),
           fetch('http://localhost:8080/api/ratings', { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          setUsername(meData.username);
+          setEmail(meData.email || "");
+          setEmailVerified(meData.emailVerified || false);
+        }
         if (wlRes.ok) setWatchlist(await wlRes.json());
         if (grRes.ok) setGroups(await grRes.json());
         if (reqRes.ok) setJoinRequests(await reqRes.json());
@@ -167,6 +204,30 @@ export default function UserDashboard() {
           <span>Logout</span>
         </button>
       </div>
+
+      {!isLoading && !emailVerified && (
+        <div className="mb-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-center space-x-3 text-left">
+            <div className="p-2 bg-yellow-500/20 text-yellow-500 rounded-lg shrink-0">
+              <Clock className="w-5 h-5 text-yellow-500" />
+            </div>
+            <div>
+              <h4 className="font-bold text-yellow-500 text-sm">Verify your email address</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {email 
+                  ? `Your email (${email}) is unverified. Verify now to protect your account and enable security recovery.`
+                  : "Please add and verify your email address to secure your account and enable password recovery."}
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsVerifyModalOpen(true)}
+            className="bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-yellow-400 transition-colors shrink-0 cursor-pointer"
+          >
+            Verify Now
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar */}
@@ -432,16 +493,63 @@ export default function UserDashboard() {
               <h2 className="text-2xl font-bold mb-6">Account Settings</h2>
               <div className="space-y-6 max-w-md w-full">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Username</label>
-                  <input type="text" disabled value={username} className="w-full bg-background border border-border px-4 py-2 rounded-md opacity-70 cursor-not-allowed" />
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium text-muted-foreground">Username</label>
+                    {emailVerified && (
+                      <button 
+                        onClick={() => setIsUsernameModalOpen(true)}
+                        className="text-xs text-primary hover:underline font-semibold bg-transparent border-0 cursor-pointer"
+                      >
+                        Change Username
+                      </button>
+                    )}
+                  </div>
+                  <input type="text" disabled value={username} className="w-full bg-secondary/50 border border-border px-4 py-2.5 rounded-lg opacity-70 cursor-not-allowed text-white" />
+                  {!emailVerified && (
+                    <p className="text-[11px] text-muted-foreground/60 italic">
+                      * Verify your email to unlock username updates.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">Email</label>
-                  <input type="email" placeholder="Add an email..." className="w-full bg-background border border-border focus:border-primary focus:outline-none px-4 py-2 rounded-md transition-colors" />
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium text-muted-foreground">Email Address</label>
+                    <div className="flex items-center space-x-2">
+                      {emailVerified ? (
+                        <span className="flex items-center space-x-1 text-xs text-green-500 font-semibold bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>Verified</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-yellow-500 font-semibold bg-yellow-500/10 border border-yellow-500/20 px-2 py-0.5 rounded-full">
+                          Unverified
+                        </span>
+                      )}
+                      {!emailVerified && (
+                        <button 
+                          onClick={() => setIsVerifyModalOpen(true)}
+                          className="text-xs text-primary hover:underline font-semibold bg-transparent border-0 cursor-pointer"
+                        >
+                          Verify/Change
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input 
+                    type="email" 
+                    disabled
+                    value={email || "No email registered"} 
+                    className="w-full bg-secondary/50 border border-border px-4 py-2.5 rounded-lg opacity-70 cursor-not-allowed text-white" 
+                  />
+                  {emailVerified && (
+                    <button 
+                      onClick={() => setIsVerifyModalOpen(true)}
+                      className="text-xs text-primary hover:underline font-semibold mt-1 block bg-transparent border-0 cursor-pointer"
+                    >
+                      Update Email Address
+                    </button>
+                  )}
                 </div>
-                <button className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:bg-primary/90 transition-colors">
-                  Save Changes
-                </button>
               </div>
             </div>
           )}
@@ -452,6 +560,29 @@ export default function UserDashboard() {
         isOpen={isGroupModalOpen} 
         onClose={() => setIsGroupModalOpen(false)} 
         onSuccess={(id) => navigate(`/group/${id}`)}
+      />
+
+      <VerificationModal 
+        isOpen={isVerifyModalOpen}
+        onClose={() => setIsVerifyModalOpen(false)}
+        currentEmail={email}
+        token={token}
+        onVerified={(verifiedEmail) => {
+          setEmail(verifiedEmail);
+          setEmailVerified(true);
+        }}
+      />
+
+      <ChangeUsernameModal 
+        isOpen={isUsernameModalOpen}
+        onClose={() => setIsUsernameModalOpen(false)}
+        verifiedEmail={email}
+        token={token}
+        onSuccess={(newToken, newName) => {
+          localStorage.setItem('jwtToken', newToken);
+          setToken(newToken);
+          setUsername(newName);
+        }}
       />
     </div>
   );

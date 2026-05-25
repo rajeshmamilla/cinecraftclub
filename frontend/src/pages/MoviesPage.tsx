@@ -78,6 +78,38 @@ export default function MoviesPage() {
   const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [genreLoading, setGenreLoading] = useState(false);
+  const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    const movieIds = [
+      ...trending.map(m => m.id),
+      ...topRated.map(m => m.id),
+      ...nowPlaying.map(m => m.id),
+      ...upcoming.map(m => m.id),
+      ...genreMovies.map(m => m.id),
+      ...(heroMovie ? [heroMovie.id] : [])
+    ];
+    if (movieIds.length === 0) return;
+    const fetchC3Ratings = async () => {
+      try {
+        const uniqueIds = Array.from(new Set(movieIds));
+        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        if (res.ok) {
+          const data = await res.json();
+          const ratingsMap: Record<number, number> = {};
+          Object.entries(data).forEach(([key, val]: [string, any]) => {
+            if (val.averageRating >= 1) {
+              ratingsMap[Number(key)] = val.averageRating;
+            }
+          });
+          setC3Ratings(ratingsMap);
+        }
+      } catch (e) {
+        console.error("Failed to fetch C3 ratings map for MoviesPage", e);
+      }
+    };
+    fetchC3Ratings();
+  }, [trending, topRated, nowPlaying, upcoming, genreMovies, heroMovie]);
 
   useEffect(() => {
     const load = async () => {
@@ -159,13 +191,12 @@ export default function MoviesPage() {
               <button
                 key={genre.id}
                 onClick={() => setSelectedGenre(genre.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-medium transition-all border ${
+                className={`flex items-center px-4 py-2 rounded-xl font-medium transition-all border ${
                   selectedGenre === genre.id
                     ? 'bg-primary text-primary-foreground border-primary scale-105'
                     : 'bg-secondary/40 border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <span>{genre.icon}</span>
                 <span>{genre.name}</span>
               </button>
             ))}
@@ -174,7 +205,7 @@ export default function MoviesPage() {
             <HorizontalScroll>
               {genreMovies.slice(0, 18).map(m => (
                 <div key={m.id} className="w-40 shrink-0">
-                  <MovieCard movie={{ ...m, media_type: 'movie' }} />
+                  <MovieCard movie={{ ...m, media_type: 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
             </HorizontalScroll>
@@ -192,7 +223,7 @@ export default function MoviesPage() {
             <HorizontalScroll>
               {nowPlaying.slice(0, 18).map(m => (
                 <div key={m.id} className="w-40 shrink-0">
-                  <MovieCard movie={{ ...m, media_type: 'movie' }} />
+                  <MovieCard movie={{ ...m, media_type: 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
             </HorizontalScroll>
@@ -210,7 +241,7 @@ export default function MoviesPage() {
             <HorizontalScroll>
               {trending.slice(0, 18).map(m => (
                 <div key={m.id} className="w-40 shrink-0">
-                  <MovieCard movie={{ ...m, media_type: m.media_type || 'movie' }} />
+                  <MovieCard movie={{ ...m, media_type: m.media_type || 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
             </HorizontalScroll>
@@ -232,7 +263,7 @@ export default function MoviesPage() {
                   <div className="absolute -top-2 -left-2 z-30 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-black shadow-lg shadow-primary/30">
                     #{i + 1}
                   </div>
-                  <MovieCard movie={{ ...m, media_type: 'movie' }} />
+                  <MovieCard movie={{ ...m, media_type: 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
             </HorizontalScroll>

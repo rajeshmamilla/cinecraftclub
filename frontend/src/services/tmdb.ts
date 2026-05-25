@@ -44,6 +44,11 @@ export interface MovieDetails extends Movie {
   episode_run_time?: number[];
   status: string;
   tagline: string;
+  imdb_id?: string;
+  external_ids?: {
+    imdb_id?: string;
+    [key: string]: any;
+  };
   credits: {
     cast: Cast[];
     crew: Crew[];
@@ -82,7 +87,7 @@ export const getMediaDetails = async (id: string, type: 'movie' | 'tv' = 'movie'
   try {
     const response = await tmdbApi.get(`/${type}/${id}`, {
       params: {
-        append_to_response: 'credits',
+        append_to_response: 'credits,external_ids',
       }
     });
     return response.data;
@@ -149,4 +154,40 @@ export const getGenreList = async (): Promise<{ id: number; name: string }[]> =>
     return response.data.genres;
   } catch (error) { return []; }
 };
+
+export const getRecommendations = async (id: string, type: 'movie' | 'tv' = 'movie', page: number = 1): Promise<Movie[]> => {
+  try {
+    const response = await tmdbApi.get(`/${type}/${id}/recommendations`, {
+      params: { page }
+    });
+    return response.data.results;
+  } catch (error) {
+    console.error(`Error fetching recommendations for ${type} ${id}:`, error);
+    return [];
+  }
+};
+
+export interface Review {
+  id: string;
+  author: string;
+  author_details: {
+    name: string;
+    username: string;
+    avatar_path: string | null;
+    rating: number | null;
+  };
+  content: string;
+  created_at: string;
+}
+
+export const getMediaReviews = async (id: string, type: 'movie' | 'tv' = 'movie'): Promise<Review[]> => {
+  try {
+    const response = await tmdbApi.get(`/${type}/${id}/reviews`);
+    return response.data.results;
+  } catch (error) {
+    console.error(`Error fetching reviews for ${type} ${id}:`, error);
+    return [];
+  }
+};
+
 
