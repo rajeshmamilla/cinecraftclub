@@ -25,7 +25,12 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String token = jwtService.generateToken(userDetails);
 
         // Redirect to frontend with token
-        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:5173/dashboard")
+        String frontendUrl = System.getenv("FRONTEND_URL");
+        if (frontendUrl == null || frontendUrl.isEmpty()) {
+            frontendUrl = "http://localhost:5173";
+        }
+
+        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/dashboard")
                 .queryParam("token", token)
                 .build().toUriString();
 
