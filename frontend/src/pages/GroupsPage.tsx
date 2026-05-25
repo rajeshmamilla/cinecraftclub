@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film, Lock, Clock, XCircle } from 'lucide-react';
@@ -39,7 +40,7 @@ export default function GroupsPage() {
       try {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`http://localhost:8080/api/groups/public?t=${Date.now()}`, { headers });
+        const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
         if (res.ok) setGroups(await res.json());
       } catch (e) {
         console.error(e);
@@ -61,7 +62,7 @@ export default function GroupsPage() {
     if (!token) { navigate('/'); return; }
     setJoiningGroupId(groupId);
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/${groupId}/join`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/${groupId}/join`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -79,7 +80,7 @@ export default function GroupsPage() {
     if (!token) { navigate('/'); return; }
     setJoiningGroupId(groupId);
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/${groupId}/request`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/${groupId}/request`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

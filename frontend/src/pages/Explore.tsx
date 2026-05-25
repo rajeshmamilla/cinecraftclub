@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { TrendingUp, RefreshCw } from 'lucide-react';
@@ -19,7 +20,7 @@ export default function Explore() {
     const fetchC3Ratings = async () => {
       try {
         const uniqueIds = Array.from(new Set(movieIds));
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
         if (res.ok) {
           const data = await res.json();
           const ratingsMap: Record<number, number> = {};

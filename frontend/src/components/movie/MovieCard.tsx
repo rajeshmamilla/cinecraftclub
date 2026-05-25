@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Plus, Check, Lock } from 'lucide-react';
@@ -25,7 +26,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
 
     const fetchAverageRating = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/${movie.id}/average`);
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${movie.id}/average`);
         if (res.ok) {
           const data = await res.json();
           if (data && data.averageRating >= 1) {
@@ -50,7 +51,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
         return;
       }
       try {
-        const res = await fetch(`http://localhost:8080/api/watchlist/check/${movie.id}?t=${Date.now()}`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${movie.id}?t=${Date.now()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -86,7 +87,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
 
     try {
       if (previousState) {
-        await fetch(`http://localhost:8080/api/watchlist/${movie.id}`, {
+        await fetch(`${API_BASE_URL}/api/watchlist/${movie.id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -95,7 +96,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
           icon: '🗑️',
         });
       } else {
-        await fetch('http://localhost:8080/api/watchlist', {
+        await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

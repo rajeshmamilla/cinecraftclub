@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
 import { X, UserCheck, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,7 +46,7 @@ export default function ChangeUsernameModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/change-username/request', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-username/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export default function ChangeUsernameModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/change-username/confirm', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/change-username/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

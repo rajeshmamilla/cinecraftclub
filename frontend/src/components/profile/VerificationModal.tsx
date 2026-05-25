@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import React, { useState, useEffect } from 'react';
 import { X, Mail, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,7 +50,7 @@ export default function VerificationModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/send-verification-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/send-verification-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +84,7 @@ export default function VerificationModal({
 
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/verify-email', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

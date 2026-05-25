@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Bookmark, Star, Users, Settings, LogOut, Plus, MessageSquare, Clock, CheckCircle } from 'lucide-react';
@@ -82,11 +83,11 @@ export default function UserDashboard() {
     const fetchData = async () => {
       try {
         const [meRes, wlRes, grRes, reqRes, ratRes] = await Promise.all([
-          fetch('http://localhost:8080/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/watchlist', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/groups/requests?status=PENDING', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:8080/api/ratings', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/watchlist`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups/requests?status=PENDING`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/ratings`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (meRes.ok) {
@@ -116,7 +117,7 @@ export default function UserDashboard() {
     ));
 
     try {
-      await fetch(`http://localhost:8080/api/watchlist/${movieId}/watched`, {
+      await fetch(`${API_BASE_URL}/api/watchlist/${movieId}/watched`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -130,14 +131,14 @@ export default function UserDashboard() {
 
   const handleRespondRequest = async (requestId: number, action: 'APPROVE' | 'REJECT') => {
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/requests/${requestId}/respond?action=${action}`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/requests/${requestId}/respond?action=${action}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         setJoinRequests(prev => prev.filter(r => r.id !== requestId));
         if (action === 'APPROVE') {
-          const grRes = await fetch('http://localhost:8080/api/groups', { headers: { 'Authorization': `Bearer ${token}` } });
+          const grRes = await fetch(`${API_BASE_URL}/api/groups`, { headers: { 'Authorization': `Bearer ${token}` } });
           if (grRes.ok) setGroups(await grRes.json());
         }
       }

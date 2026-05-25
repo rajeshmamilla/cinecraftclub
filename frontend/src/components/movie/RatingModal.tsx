@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import { useState, useEffect, useRef } from 'react';
 import { Star, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -37,7 +38,7 @@ export default function RatingModal({
     if (!token) return;
     const fetch_ = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/${movieId}`, {
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${movieId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok && res.status !== 204) {
@@ -67,7 +68,7 @@ export default function RatingModal({
     }
     setIsSubmitting(true);
     try {
-      const res = await fetch('http://localhost:8080/api/ratings', {
+      const res = await fetch(`${API_BASE_URL}/api/ratings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
@@ -99,7 +100,7 @@ export default function RatingModal({
     if (!token) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:8080/api/ratings/movie/${movieId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${movieId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

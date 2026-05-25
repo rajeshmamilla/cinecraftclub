@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Send, LogOut, Users, ArrowLeft, MoreVertical, Hash, Plus, Info } from 'lucide-react';
@@ -86,7 +87,7 @@ export default function GroupChat() {
   // Fetch sidebar groups
   useEffect(() => {
     if (!token) return;
-    fetch('http://localhost:8080/api/groups', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_BASE_URL}/api/groups`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : []).then(setUserGroups).catch(console.error);
   }, [id]);
 
@@ -96,8 +97,8 @@ export default function GroupChat() {
     const load = async () => {
       try {
         const [gRes, mRes] = await Promise.all([
-          fetch(`http://localhost:8080/api/groups/${id}/details`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`http://localhost:8080/api/groups/${id}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups/${id}/details`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups/${id}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
         if (gRes.ok) {
           const groupData = await gRes.json();
@@ -177,7 +178,7 @@ export default function GroupChat() {
     if (e) e.preventDefault();
     if (!newMessage.trim()) return;
     try {
-      const r = await fetch(`http://localhost:8080/api/groups/${id}/messages`, {
+      const r = await fetch(`${API_BASE_URL}/api/groups/${id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ content: newMessage }),
@@ -193,7 +194,7 @@ export default function GroupChat() {
   const handleUnsend = async (msgId: number) => {
     if (!confirm('Unsend this message?')) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/messages/${msgId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/messages/${msgId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -210,14 +211,14 @@ export default function GroupChat() {
 
   const leaveGroup = async () => {
     if (!confirm('Leave this group?')) return;
-    await fetch(`http://localhost:8080/api/groups/${id}/leave`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+    await fetch(`${API_BASE_URL}/api/groups/${id}/leave`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     navigate('/groups');
   };
 
   const joinGroup = async () => {
     if (!token) return;
     try {
-      const r = await fetch(`http://localhost:8080/api/groups/${id}/join`, {
+      const r = await fetch(`${API_BASE_URL}/api/groups/${id}/join`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -225,7 +226,7 @@ export default function GroupChat() {
         const updated = await r.json();
         setGroup(prev => prev ? { ...prev, isMember: true, memberCount: updated.memberCount } : null);
         // Refresh sidebar
-        fetch('http://localhost:8080/api/groups', { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE_URL}/api/groups`, { headers: { Authorization: `Bearer ${token}` } })
           .then(r => r.ok ? r.json() : []).then(setUserGroups).catch(console.error);
         toast.success("Successfully joined the group! 🎉");
       } else {
@@ -293,7 +294,7 @@ export default function GroupChat() {
     setHoveredMsg(null);
 
     try {
-      await fetch(`http://localhost:8080/api/discussions/${msgId}/reactions`, {
+      await fetch(`${API_BASE_URL}/api/discussions/${msgId}/reactions`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json', 

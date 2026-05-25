@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Play, TrendingUp, Award, Clapperboard, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -93,7 +94,7 @@ export default function MoviesPage() {
     const fetchC3Ratings = async () => {
       try {
         const uniqueIds = Array.from(new Set(movieIds));
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
         if (res.ok) {
           const data = await res.json();
           const ratingsMap: Record<number, number> = {};

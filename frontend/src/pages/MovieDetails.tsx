@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film } from 'lucide-react';
@@ -82,7 +83,7 @@ export default function MovieDetails() {
     const fetchC3Average = async () => {
       if (id) {
         try {
-          const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}/average?t=${Date.now()}`);
+          const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${id}/average?t=${Date.now()}`);
           if (res.ok) {
             const data = await res.json();
             setC3AverageRating(data.averageRating ?? 0);
@@ -101,7 +102,7 @@ export default function MovieDetails() {
     const fetchC3RecRatings = async () => {
       try {
         const uniqueIds = Array.from(new Set(movieIds));
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
         if (res.ok) {
           const data = await res.json();
           const ratingsMap: Record<number, number> = {};
@@ -149,7 +150,7 @@ export default function MovieDetails() {
       if (id) {
         setReviewsLoading(true);
         try {
-          const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}/all?t=${Date.now()}`);
+          const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${id}/all?t=${Date.now()}`);
           if (res.ok) {
             const data = await res.json();
             // Filter only ratings that actually have a written review
@@ -177,7 +178,7 @@ export default function MovieDetails() {
       try {
         const headers: Record<string, string> = {};
         if (freshToken) headers['Authorization'] = `Bearer ${freshToken}`;
-        const res = await fetch(`http://localhost:8080/api/groups/movie/${id}?t=${Date.now()}`, { headers });
+        const res = await fetch(`${API_BASE_URL}/api/groups/movie/${id}?t=${Date.now()}`, { headers });
         if (res.ok) {
           const data = await res.json();
           setGroups(data);
@@ -196,7 +197,7 @@ export default function MovieDetails() {
     if (!id || !token) { setWatchlistLoading(false); return; }
     const check = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/watchlist/check/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) setInWatchlist(await res.json());
@@ -211,7 +212,7 @@ export default function MovieDetails() {
     if (!id || !token) { setUserRating(0); return; }
     const fetchRating = async () => {
       try {
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok && res.status !== 204) {
@@ -234,13 +235,13 @@ export default function MovieDetails() {
     const title = movie?.title || movie?.name || 'Movie';
     try {
       if (prev) {
-        await fetch(`http://localhost:8080/api/watchlist/${id}`, {
+        await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         toast.error('Removed from Watchlist', { description: title, icon: '🗑️' });
       } else {
-        await fetch('http://localhost:8080/api/watchlist', {
+        await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
@@ -265,7 +266,7 @@ export default function MovieDetails() {
     }
     setJoiningGroupId(groupId);
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/${groupId}/join`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/${groupId}/join`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import { useState, useEffect } from "react";
 import { X, Search, Lock, Globe } from "lucide-react";
 import { searchMulti, getImageUrl } from "../../services/tmdb";
@@ -81,7 +82,7 @@ export default function CreateGroupModal({
 
     try {
       const token = localStorage.getItem("jwtToken");
-      const response = await fetch("http://localhost:8080/api/groups", {
+      const response = await fetch(`${API_BASE_URL}/api/groups`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

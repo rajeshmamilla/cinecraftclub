@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../../config';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -96,7 +97,7 @@ export default function Navbar() {
         const action = JSON.parse(pendingActionStr);
         if (action.type === 'ADD_WATCHLIST' && action.movie) {
           const movie = action.movie;
-          await fetch('http://localhost:8080/api/watchlist', {
+          await fetch(`${API_BASE_URL}/api/watchlist`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export default function Navbar() {
     setIsLoading(true);
     try {
       const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(`http://localhost:8080${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: authUsername, password: authPassword })
@@ -198,7 +199,7 @@ export default function Navbar() {
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/forgot-password/request', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail })
@@ -234,7 +235,7 @@ export default function Navbar() {
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/auth/forgot-password/reset', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, code: forgotCode, newPassword: forgotNewPassword })
@@ -555,7 +556,7 @@ export default function Navbar() {
                   </div>
 
                   <a 
-                    href="http://localhost:8080/oauth2/authorization/google"
+                    href={`${API_BASE_URL}/oauth2/authorization/google`}
                     className="w-full bg-white hover:bg-gray-100 text-black font-medium py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24">

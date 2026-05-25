@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, MessageSquare, TrendingUp, Lock, Clock, XCircle } from 'lucide-react';
@@ -41,7 +42,7 @@ export default function Home() {
       if (movieIds.length === 0) return;
       try {
         const uniqueIds = Array.from(new Set(movieIds));
-        const res = await fetch(`http://localhost:8080/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
+        const res = await fetch(`${API_BASE_URL}/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
         if (res.ok) {
           const data = await res.json();
           const ratingsMap: Record<number, number> = {};
@@ -78,7 +79,7 @@ export default function Home() {
       try {
         const headers: Record<string, string> = {};
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`http://localhost:8080/api/groups/public?t=${Date.now()}`, { headers });
+        const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
         if (res.ok) {
           const data = await res.json();
           // Sort by memberCount descending
@@ -126,7 +127,7 @@ export default function Home() {
       }
       setJoiningGroupId(group.id);
       try {
-        const res = await fetch(`http://localhost:8080/api/groups/${group.id}/request`, {
+        const res = await fetch(`${API_BASE_URL}/api/groups/${group.id}/request`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -145,7 +146,7 @@ export default function Home() {
     // Automatically join the group and then navigate to chat
     setJoiningGroupId(group.id);
     try {
-      const res = await fetch(`http://localhost:8080/api/groups/${group.id}/join`, {
+      const res = await fetch(`${API_BASE_URL}/api/groups/${group.id}/join`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
