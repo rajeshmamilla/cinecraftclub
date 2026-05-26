@@ -6,6 +6,7 @@ import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../servi
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
+import { toast } from 'sonner';
 
 interface GroupResponse {
   id: string;
@@ -32,6 +33,8 @@ export default function Home() {
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
   const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
   const navigate = useNavigate();
+  const token = getValidToken();
+  const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
     const fetchC3Ratings = async () => {
@@ -118,11 +121,11 @@ export default function Home() {
 
     if (group.isPrivate) {
       if (group.joinRequestStatus === 'PENDING') {
-        alert("Your request to join this private group is pending approval.");
+        toast.warning("Your request to join this private group is pending approval.");
         return;
       }
       if (group.joinRequestStatus === 'DENIED') {
-        alert("Your request to join this private group was declined.");
+        toast.error("Your request to join this private group was declined.");
         return;
       }
       setJoiningGroupId(group.id);
@@ -132,7 +135,7 @@ export default function Home() {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
-          alert("Request to join private group sent to the admin.");
+          toast.success("Request to join private group sent to the admin.");
           setGroups(prev => prev.map(g => g.id === group.id ? { ...g, joinRequestStatus: 'PENDING' } : g));
         }
       } catch (e) {
@@ -337,12 +340,14 @@ export default function Home() {
                 </div>
                 
                 <div className="flex items-center justify-between pt-4 border-t border-border/50 text-xs text-muted-foreground mt-auto">
-                  <span>Created by: <span className="font-semibold text-foreground">{group.createdBy}</span></span>
+                  <span>Created by: <span className="font-semibold text-foreground">
+                    {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                  </span></span>
                   {joiningGroupId === group.id ? (
                     <span className="text-primary animate-pulse font-medium">Processing...</span>
                   ) : group.isMember ? (
-                    <span className="text-green-400 font-medium flex items-center space-x-1">
-                      <span>Joined</span>
+                    <span className={`${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} font-medium flex items-center space-x-1`}>
+                      <span>{currentUser && group.createdBy === currentUser ? 'Admin' : 'Joined'}</span>
                     </span>
                   ) : group.isPrivate ? (
                     group.joinRequestStatus === 'PENDING' ? (

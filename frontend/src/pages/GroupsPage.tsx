@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film, Lock, Clock, XCircle } from 'lucide-react';
+import { MessageSquare, Users, Plus, Search, CheckCircle, LogIn, Film, Lock, Clock, XCircle, Shield } from 'lucide-react';
 import { getImageUrl } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
 
@@ -32,6 +32,7 @@ export default function GroupsPage() {
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
 
   const token = getValidToken();
+  const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
     const fetchGroups = async (showSkeleton = true) => {
@@ -209,9 +210,20 @@ export default function GroupsPage() {
                   <span className="text-xs font-medium text-white/90 truncate max-w-[200px]">{group.movieTitle}</span>
                 </div>
                 {group.isMember && (
-                  <div className="absolute top-2 right-2 bg-green-500/90 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 font-bold">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Member</span>
+                  <div className={`absolute top-2 right-2 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center space-x-1 font-bold ${
+                    currentUser && group.createdBy === currentUser ? 'bg-primary/95' : 'bg-green-500/90'
+                  }`}>
+                    {currentUser && group.createdBy === currentUser ? (
+                      <>
+                        <Shield className="w-3 h-3" />
+                        <span>Admin</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-3 h-3" />
+                        <span>Member</span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -243,7 +255,9 @@ export default function GroupsPage() {
                       <Users className="w-3.5 h-3.5 text-primary/70" />
                       <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
                     </span>
-                    <span className="mt-0.5">Created by: <span className="font-semibold text-foreground">{group.createdBy}</span></span>
+                    <span className="mt-0.5">Created by: <span className="font-semibold text-foreground">
+                      {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                    </span></span>
                   </div>
 
                   {group.isMember ? (

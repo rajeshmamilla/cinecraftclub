@@ -8,6 +8,7 @@ interface CreateGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (groupId: number) => void;
+  initialMovie?: Movie | null;
 }
 
 const CRAFTS = [
@@ -27,11 +28,12 @@ export default function CreateGroupModal({
   isOpen,
   onClose,
   onSuccess,
+  initialMovie = null,
 }: CreateGroupModalProps) {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialMovie ? 2 : 1);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(initialMovie);
   const [isSearching, setIsSearching] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -62,6 +64,32 @@ export default function CreateGroupModal({
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialMovie) {
+        setSelectedMovie(initialMovie);
+        setStep(2);
+        setFormData({
+          name: `${initialMovie.title || initialMovie.name} Discussion`,
+          description: "",
+          isPrivate: false,
+        });
+      } else {
+        setSelectedMovie(null);
+        setStep(1);
+        setSearchQuery("");
+        setFormData({
+          name: "",
+          description: "",
+          isPrivate: false,
+        });
+      }
+      setSelectedFocuses(["General Discussion"]);
+      setFocusInput("");
+      setError("");
+    }
+  }, [isOpen, initialMovie]);
 
   if (!isOpen) return null;
 

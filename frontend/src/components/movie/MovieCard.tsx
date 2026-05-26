@@ -93,7 +93,6 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
         });
         toast.error(`Removed from Watchlist`, {
           description: movie.title || movie.name,
-          icon: '🗑️',
         });
       } else {
         await fetch(`${API_BASE_URL}/api/watchlist`, {
@@ -112,9 +111,8 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
             releaseDate: movie.release_date || movie.first_air_date
           })
         });
-        toast.success(`Added to Watchlist! 🎬`, {
+        toast.success(`Added to Watchlist`, {
           description: movie.title || movie.name,
-          icon: '✅',
         });
       }
     } catch (e) {

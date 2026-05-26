@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film } from 'lucide-react';
+import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMediaDetails, getImageUrl, getRecommendations } from '../services/tmdb';
 import type { MovieDetails as MovieDetailsType, Movie } from '../services/tmdb';
@@ -22,6 +22,7 @@ interface Review {
 }
 import { getValidToken } from '../utils/auth';
 import RatingModal from '../components/movie/RatingModal';
+import CreateGroupModal from '../components/groups/CreateGroupModal';
 import MovieCard from '../components/movie/MovieCard';
 
 interface GroupResponse {
@@ -58,6 +59,7 @@ export default function MovieDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [recommendations, setRecommendations] = useState<Movie[]>([]);
   const [recsLoading, setRecsLoading] = useState(true);
 
@@ -78,6 +80,7 @@ export default function MovieDetails() {
   const [c3RecRatings, setC3RecRatings] = useState<Record<number, number>>({});
 
   const token = getValidToken();
+  const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
     const fetchC3Average = async () => {
@@ -239,7 +242,7 @@ export default function MovieDetails() {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        toast.error('Removed from Watchlist', { description: title, icon: '🗑️' });
+        toast.error('Removed from Watchlist', { description: title });
       } else {
         await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
@@ -254,7 +257,7 @@ export default function MovieDetails() {
             releaseDate: movie?.release_date || movie?.first_air_date
           })
         });
-        toast.success('Added to Watchlist! 🎬', { description: title, icon: '✅' });
+        toast.success('Added to Watchlist', { description: title });
       }
     } catch (e) { setInWatchlist(prev); toast.error('Something went wrong.'); }
   };
@@ -327,6 +330,14 @@ export default function MovieDetails() {
           setUserRating(r);
           setReviewsTrigger(prev => prev + 1);
         }}
+      />
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onSuccess={(groupId) => navigate(`/group/${groupId}`)}
+        initialMovie={movie}
       />
 
       <section className="relative w-full">
@@ -426,7 +437,10 @@ export default function MovieDetails() {
                 )}
                 <div className="w-1 h-1 bg-border rounded-full" />
                 <button
-                  onClick={() => token ? navigate('/dashboard?tab=groups') : navigate('/')}
+                  onClick={() => {
+                    if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
+                    setIsCreateGroupOpen(true);
+                  }}
                   className="flex items-center space-x-1.5 px-3 py-1 rounded-full border border-border bg-secondary/80 hover:bg-secondary text-foreground hover:text-primary hover:border-primary transition-all font-semibold text-sm group"
                 >
                   <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -644,9 +658,18 @@ export default function MovieDetails() {
                         <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
                       </span>
                       {group.isMember && (
-                        <span className="text-[10px] text-green-400 flex items-center space-x-1 font-medium">
-                          <CheckCircle className="w-3 h-3" />
-                          <span>Joined</span>
+                        <span className={`text-[10px] ${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} flex items-center space-x-1 font-medium`}>
+                          {currentUser && group.createdBy === currentUser ? (
+                            <>
+                              <Shield className="w-3 h-3" />
+                              <span>Admin</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Joined</span>
+                            </>
+                          )}
                         </span>
                       )}
                     </div>
@@ -673,7 +696,9 @@ export default function MovieDetails() {
                       <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-2">{group.description}</p>
                     )}
                     <p className="text-[10px] text-muted-foreground">
-                      Created by: <span className="font-semibold text-foreground">{group.createdBy}</span>
+                      Created by: <span className="font-semibold text-foreground">
+                        {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                      </span>
                     </p>
                   </div>
 

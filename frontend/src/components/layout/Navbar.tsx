@@ -59,6 +59,13 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    // If there is a pending group invite and the user is not logged in, open the auth modal immediately
+    if (!isLoggedIn && localStorage.getItem('pendingGroupInvite')) {
+      setIsAuthModalOpen(true);
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsSearching(true);
@@ -170,8 +177,14 @@ export default function Navbar() {
             description: "Please verify your email under settings soon to secure your account. Redirecting you to the Home page...",
             duration: 5000
           });
+          const pendingInvite = localStorage.getItem('pendingGroupInvite');
           setTimeout(() => {
-            navigate('/');
+            if (pendingInvite) {
+              localStorage.removeItem('pendingGroupInvite');
+              navigate(`/group/${pendingInvite}`);
+            } else {
+              navigate('/');
+            }
           }, 3000);
           return;
         } else {
@@ -181,7 +194,13 @@ export default function Navbar() {
         console.error("Error handling post-auth redirection", e);
       }
       
-      navigate('/');
+      const pendingInvite = localStorage.getItem('pendingGroupInvite');
+      if (pendingInvite) {
+        localStorage.removeItem('pendingGroupInvite');
+        navigate(`/group/${pendingInvite}`);
+      } else {
+        navigate('/');
+      }
     } catch (err: any) {
       setAuthError(err.message);
     } finally {
@@ -246,7 +265,7 @@ export default function Navbar() {
         throw new Error(errText || "Failed to reset password");
       }
       
-      alert("Password reset successfully! Please sign in with your new password.");
+      toast.success("Password reset successfully! Please sign in with your new password.");
       setAuthMode('login');
       setAuthUsername("");
       setAuthPassword("");

@@ -50,8 +50,14 @@ export default function UserDashboard() {
             description: "Please verify your email under settings soon to secure your account. Redirecting you to the Home page...",
             duration: 5000
           });
+          const pendingInvite = localStorage.getItem('pendingGroupInvite');
           setTimeout(() => {
-            navigate('/');
+            if (pendingInvite) {
+              localStorage.removeItem('pendingGroupInvite');
+              navigate(`/group/${pendingInvite}`);
+            } else {
+              navigate('/');
+            }
           }, 3000);
           return;
         } else {
@@ -61,7 +67,13 @@ export default function UserDashboard() {
         console.error("Error handling Google OAuth post-login redirect", e);
       }
 
-      navigate('/');
+      const pendingInvite = localStorage.getItem('pendingGroupInvite');
+      if (pendingInvite) {
+        localStorage.removeItem('pendingGroupInvite');
+        navigate(`/group/${pendingInvite}`);
+      } else {
+        navigate('/');
+      }
       return;
     } else {
       const storedToken = localStorage.getItem('jwtToken');
