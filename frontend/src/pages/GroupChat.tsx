@@ -80,7 +80,17 @@ export default function GroupChat() {
 
   // Decode current user from JWT
   useEffect(() => {
-    if (!token) { navigate('/'); return; }
+    if (!token) {
+      if (id) {
+        localStorage.setItem('pendingGroupInvite', id);
+        toast.info("Authentication Required", {
+          description: "Please log in or sign up to join the discussion group.",
+          duration: 4000
+        });
+      }
+      navigate('/');
+      return;
+    }
     try { setCurrentUser(JSON.parse(atob(token.split('.')[1])).sub); } catch {}
   }, []);
 
