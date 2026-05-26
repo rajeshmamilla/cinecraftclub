@@ -139,7 +139,14 @@ function HorizontalScroll({ children }: { children: React.ReactNode }) {
         onScroll={handleScroll}
         className={`flex space-x-4 overflow-x-auto pb-4 scrollbar-hide ${!isReady ? 'invisible' : ''}`}
       >
-        {triplicatedChildren}
+        {triplicatedChildren.map((child, idx) => {
+          if (React.isValidElement(child)) {
+            return React.cloneElement(child, {
+              key: `${child.key || idx}-${Math.floor(idx / count)}`
+            } as any);
+          }
+          return child;
+        })}
       </div>
       <button 
         onClick={() => scroll('right')} 
