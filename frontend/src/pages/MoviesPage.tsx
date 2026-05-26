@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../config';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Play, TrendingUp, Award, Clapperboard, Clock, ChevronRight, ChevronLeft } from 'lucide-react';
 import {
@@ -22,18 +22,130 @@ const CRAFT_GENRES = [
 
 function HorizontalScroll({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const scroll = (dir: 'left' | 'right') => {
-    if (ref.current) ref.current.scrollBy({ left: dir === 'right' ? 400 : -400, behavior: 'smooth' });
+  const [isReady, setIsReady] = useState(false);
+  const scrollAnimRef = useRef<number | null>(null);
+
+  const childrenArray = React.Children.toArray(children);
+  const count = childrenArray.length;
+  const triplicatedChildren = [...childrenArray, ...childrenArray, ...childrenArray];
+
+  const getStepAndGroupWidth = (clientWidth: number) => {
+    let cardWidth = 160; // Mobile default (w-40)
+    if (window.innerWidth >= 1024) { // lg breakpoint (1024px)
+      cardWidth = (clientWidth + 16) / 9 - 16;
+    }
+    const step = cardWidth + 16; // Card width + space-x-4 gap (16px)
+    const groupWidth = count * step;
+    return { step, groupWidth };
   };
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const initializeScroll = () => {
+      const { groupWidth } = getStepAndGroupWidth(el.clientWidth);
+      if (groupWidth > 0) {
+        el.scrollLeft = groupWidth;
+        setIsReady(true);
+      }
+    };
+
+    initializeScroll();
+    const timer = setTimeout(initializeScroll, 100);
+    const observer = new ResizeObserver(initializeScroll);
+    observer.observe(el);
+
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current);
+    };
+  }, [children]);
+
+  const handleScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const { scrollLeft } = el;
+    const { groupWidth } = getStepAndGroupWidth(el.clientWidth);
+
+    if (scrollLeft < groupWidth) {
+      el.scrollLeft = scrollLeft + groupWidth;
+    } else if (scrollLeft >= groupWidth * 2) {
+      el.scrollLeft = scrollLeft - groupWidth;
+    }
+  };
+
+  const smoothScrollTo = (element: HTMLDivElement, target: number, duration: number = 400) => {
+    if (scrollAnimRef.current) {
+      cancelAnimationFrame(scrollAnimRef.current);
+    }
+    const start = element.scrollLeft;
+    const change = target - start;
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      const easeOutQuad = (t: number) => t * (2 - t);
+      
+      element.scrollLeft = start + change * easeOutQuad(progress);
+
+      if (progress < 1) {
+        scrollAnimRef.current = requestAnimationFrame(animate);
+      } else {
+        scrollAnimRef.current = null;
+      }
+    };
+
+    scrollAnimRef.current = requestAnimationFrame(animate);
+  };
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = ref.current;
+    if (!el) return;
+    const { scrollLeft } = el;
+    const { step, groupWidth } = getStepAndGroupWidth(el.clientWidth);
+
+    if (dir === 'right') {
+      let currentScroll = scrollLeft;
+      if (scrollLeft + step >= groupWidth * 2) {
+        currentScroll = scrollLeft - groupWidth;
+        el.scrollLeft = currentScroll;
+      }
+      smoothScrollTo(el, currentScroll + step);
+    } else {
+      let currentScroll = scrollLeft;
+      if (scrollLeft - step < groupWidth) {
+        currentScroll = scrollLeft + groupWidth;
+        el.scrollLeft = currentScroll;
+      }
+      smoothScrollTo(el, currentScroll - step);
+    }
+  };
+
   return (
     <div className="relative group/scroll">
-      <button onClick={() => scroll('left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/90 border border-border rounded-full flex items-center justify-center opacity-0 group-hover/scroll:opacity-100 transition-opacity shadow-lg -translate-x-5 hover:bg-secondary">
+      <button 
+        onClick={() => scroll('left')} 
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 backdrop-blur-sm border border-border rounded-full flex items-center justify-center opacity-70 md:opacity-0 group-hover/scroll:opacity-100 transition-all shadow-lg -translate-x-3 md:-translate-x-5 hover:opacity-100 hover:scale-110 hover:bg-secondary cursor-pointer"
+        title="Scroll Left"
+      >
         <ChevronLeft className="w-5 h-5" />
       </button>
-      <div ref={ref} className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-        {children}
+      <div 
+        ref={ref} 
+        onScroll={handleScroll}
+        className={`flex space-x-4 overflow-x-auto pb-4 scrollbar-hide ${!isReady ? 'invisible' : ''}`}
+      >
+        {triplicatedChildren}
       </div>
-      <button onClick={() => scroll('right')} className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/90 border border-border rounded-full flex items-center justify-center opacity-0 group-hover/scroll:opacity-100 transition-opacity shadow-lg translate-x-5 hover:bg-secondary">
+      <button 
+        onClick={() => scroll('right')} 
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-10 bg-background/80 backdrop-blur-sm border border-border rounded-full flex items-center justify-center opacity-70 md:opacity-0 group-hover/scroll:opacity-100 transition-all shadow-lg translate-x-3 md:translate-x-5 hover:opacity-100 hover:scale-110 hover:bg-secondary cursor-pointer"
+        title="Scroll Right"
+      >
         <ChevronRight className="w-5 h-5" />
       </button>
     </div>
@@ -57,8 +169,8 @@ function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title
 function SkeletonRow() {
   return (
     <div className="flex space-x-4">
-      {[...Array(6)].map((_, i) => (
-        <div key={i} className="w-40 shrink-0">
+      {[...Array(9)].map((_, i) => (
+        <div key={i} className="w-40 lg:w-[calc((100%-128px)/9)] shrink-0">
           <div className="aspect-[2/3] bg-secondary/50 rounded-lg animate-pulse mb-2" />
           <div className="h-3 bg-secondary/40 rounded animate-pulse mb-1" />
           <div className="h-3 bg-secondary/30 rounded animate-pulse w-2/3" />
@@ -205,7 +317,7 @@ export default function MoviesPage() {
           {genreLoading ? <SkeletonRow /> : (
             <HorizontalScroll>
               {genreMovies.slice(0, 18).map(m => (
-                <div key={m.id} className="w-40 shrink-0">
+                <div key={m.id} className="w-40 lg:w-[calc((100%-128px)/9)] shrink-0">
                   <MovieCard movie={{ ...m, media_type: 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
@@ -223,7 +335,7 @@ export default function MoviesPage() {
           {isLoading ? <SkeletonRow /> : (
             <HorizontalScroll>
               {nowPlaying.slice(0, 18).map(m => (
-                <div key={m.id} className="w-40 shrink-0">
+                <div key={m.id} className="w-40 lg:w-[calc((100%-128px)/9)] shrink-0">
                   <MovieCard movie={{ ...m, media_type: 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
@@ -241,7 +353,7 @@ export default function MoviesPage() {
           {isLoading ? <SkeletonRow /> : (
             <HorizontalScroll>
               {trending.slice(0, 18).map(m => (
-                <div key={m.id} className="w-40 shrink-0">
+                <div key={m.id} className="w-40 lg:w-[calc((100%-128px)/9)] shrink-0">
                   <MovieCard movie={{ ...m, media_type: m.media_type || 'movie' }} c3Rating={c3Ratings[m.id]} />
                 </div>
               ))}
@@ -259,7 +371,7 @@ export default function MoviesPage() {
           {isLoading ? <SkeletonRow /> : (
             <HorizontalScroll>
               {topRated.slice(0, 18).map((m, i) => (
-                <div key={m.id} className="w-40 shrink-0 relative">
+                <div key={m.id} className="w-40 lg:w-[calc((100%-128px)/9)] shrink-0 relative">
                   {/* Rank badge */}
                   <div className="absolute -top-2 -left-2 z-30 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-black shadow-lg shadow-primary/30">
                     #{i + 1}
