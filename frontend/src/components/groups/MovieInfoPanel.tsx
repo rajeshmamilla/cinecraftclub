@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Star, Clock, Calendar, ChevronDown, ChevronUp, Film, Info, Award } from 'lucide-react';
+import { useState } from 'react';
+import { Star, Clock, Calendar, ChevronDown, ChevronUp, Film, Info } from 'lucide-react';
 import { getImageUrl } from '@/services/tmdb';
 
 interface MovieInfoPanelProps {
@@ -17,76 +17,10 @@ interface MovieInfoPanelProps {
   } | null;
 }
 
-const getAccolades = (movieInfo: any) => {
-  const accolades = [];
-  const rating = movieInfo.voteAverage || 0;
-
-  if (rating >= 8.2) {
-    accolades.push({ title: "TMDB Gold Masterpiece Citation", desc: "Awarded to films rated 8.2+ by the global community." });
-  } else if (rating >= 7.5) {
-    accolades.push({ title: "TMDB Acclaimed Selection", desc: "Awarded to films rated 7.5+ with highly positive reception." });
-  } else if (rating >= 6.8) {
-    accolades.push({ title: "TMDB Fan Favorite Certificate", desc: "Recognized for strong audience engagement and rating above 6.8." });
-  }
-
-  if (movieInfo.runtime && movieInfo.runtime > 150) {
-    accolades.push({ title: "Epic Length Honor", desc: "For outstanding achievement in long-form narrative structure." });
-  }
-
-  if (movieInfo.title && (
-    movieInfo.title.toLowerCase().includes("arjun reddy") ||
-    movieInfo.title.toLowerCase().includes("kalki") ||
-    movieInfo.title.toLowerCase().includes("mahanati") ||
-    movieInfo.title.toLowerCase().includes("baahubali")
-  )) {
-    accolades.push({ title: "National Cinema Landmark Recognition", desc: "Recognized as a path-breaking cinematic milestone in Indian cinema." });
-  }
-
-  accolades.push({ title: "Official CineCraft Selection", desc: "Curated into the official CineCraft filmmaking discussions catalog." });
-
-  return accolades;
-};
-
 export default function MovieInfoPanel({ movieInfo }: MovieInfoPanelProps) {
-  const [expandedRecognitions, setExpandedRecognitions] = useState(false);
   const [showCredits, setShowCredits] = useState(false);
-  const [imdbRating, setImdbRating] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!movieInfo?.imdbId) {
-      setImdbRating(null);
-      return;
-    }
-    
-    // Set immediate estimate fallback based on TMDB rating
-    const fallbackScore = movieInfo.voteAverage 
-      ? (movieInfo.voteAverage + 0.1).toFixed(1) 
-      : '7.5';
-    setImdbRating(fallbackScore);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800);
-
-    fetch(`https://imdb.iamidiotareyoutoo.com/search?tt=${movieInfo.imdbId}`, { signal: controller.signal })
-      .then(r => r.json())
-      .then(data => {
-        clearTimeout(timeoutId);
-        if (data && data.short && data.short.aggregateRating) {
-          const rating = data.short.aggregateRating.ratingValue;
-          if (rating) setImdbRating(Number(rating).toFixed(1));
-        } else if (data && data.rating) {
-          setImdbRating(Number(data.rating).toFixed(1));
-        }
-      })
-      .catch(() => {
-        // fallback holds
-      });
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [movieInfo?.imdbId, movieInfo?.voteAverage]);
 
   if (!movieInfo) {
     return (
@@ -98,7 +32,6 @@ export default function MovieInfoPanel({ movieInfo }: MovieInfoPanelProps) {
   }
 
   const releaseYear = movieInfo.releaseDate ? movieInfo.releaseDate.split('-')[0] : 'N/A';
-  const accolades = getAccolades(movieInfo);
 
   return (
     <div className="p-4 border-b border-border/40 bg-card/30 backdrop-blur-md">
@@ -152,34 +85,8 @@ export default function MovieInfoPanel({ movieInfo }: MovieInfoPanelProps) {
               title="View on IMDb"
             >
               <span className="bg-[#f5c518] text-black text-[9px] px-1 py-0.2 rounded font-black tracking-tight leading-none">IMDb</span>
-              <span>{imdbRating || '...'}</span>
             </a>
           )}
-        </div>
-
-        {/* Recognitions Accordion */}
-        <div className="pt-2 border-t border-border/20">
-          <button
-            onClick={() => setExpandedRecognitions(!expandedRecognitions)}
-            className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors py-1 focus:outline-none"
-          >
-            <span>Recognitions</span>
-            {expandedRecognitions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
-          
-          <div className={`transition-all duration-300 overflow-hidden ${expandedRecognitions ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-            <div className="space-y-2 bg-secondary/25 p-2.5 rounded-lg border border-border/20 text-[11px] max-h-48 overflow-y-auto scrollbar-thin">
-              {accolades.map((a, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <Award className="w-4 h-4 text-primary shrink-0 mt-0.5 animate-pulse" />
-                  <div>
-                    <h5 className="font-bold text-foreground leading-snug">{a.title}</h5>
-                    <p className="text-[10px] text-muted-foreground/80 leading-relaxed">{a.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Cast & Crew Accordion */}
