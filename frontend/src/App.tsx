@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import RootLayout from './components/layout/RootLayout';
 import Home from './pages/Home';
 import MovieDetails from './pages/MovieDetails';
@@ -25,11 +26,28 @@ function App() {
       </Routes>
       <Toaster
         theme="dark"
-        richColors
         position="top-center"
+        icons={{
+          success: <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />,
+          error: <XCircle className="w-4 h-4 text-rose-500 shrink-0" />,
+          warning: <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />,
+        }}
         toastOptions={{
-          style: { minWidth: '320px', fontSize: '14px' },
-          duration: 3500,
+          style: {
+            background: 'rgba(9, 9, 11, 0.5)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+            color: '#fafafa',
+            fontSize: '14px',
+            padding: '10px 14px',
+            minWidth: '300px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          },
+          duration: 3000,
         }}
       />
     </Router>

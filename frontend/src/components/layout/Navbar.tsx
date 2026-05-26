@@ -246,7 +246,7 @@ export default function Navbar() {
         throw new Error(errText || "Failed to reset password");
       }
       
-      alert("Password reset successfully! Please sign in with your new password.");
+      toast.success("Password reset successfully! Please sign in with your new password.");
       setAuthMode('login');
       setAuthUsername("");
       setAuthPassword("");

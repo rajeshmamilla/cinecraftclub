@@ -6,6 +6,7 @@ import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../servi
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
+import { toast } from 'sonner';
 
 interface GroupResponse {
   id: string;
@@ -118,11 +119,11 @@ export default function Home() {
 
     if (group.isPrivate) {
       if (group.joinRequestStatus === 'PENDING') {
-        alert("Your request to join this private group is pending approval.");
+        toast.warning("Your request to join this private group is pending approval.");
         return;
       }
       if (group.joinRequestStatus === 'DENIED') {
-        alert("Your request to join this private group was declined.");
+        toast.error("Your request to join this private group was declined.");
         return;
       }
       setJoiningGroupId(group.id);
@@ -132,7 +133,7 @@ export default function Home() {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
-          alert("Request to join private group sent to the admin.");
+          toast.success("Request to join private group sent to the admin.");
           setGroups(prev => prev.map(g => g.id === group.id ? { ...g, joinRequestStatus: 'PENDING' } : g));
         }
       } catch (e) {

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { getValidToken } from '../../utils/auth';
+import ConfirmationModal from '../ui/ConfirmationModal';
 
 interface RatingModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function RatingModal({
   const [review, setReview] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingRatingId, setExistingRatingId] = useState<number | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Fetch existing rating for this movie on open
@@ -81,7 +83,7 @@ export default function RatingModal({
         }),
       });
       if (res.ok) {
-        toast.success(`Rated "${movieTitle}" ${selectedStar}/10 ⭐`);
+        toast.success(`Rated "${movieTitle}" ${selectedStar}/10`);
         onSuccess?.(selectedStar);
         onClose();
       } else {
@@ -94,8 +96,11 @@ export default function RatingModal({
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to remove your rating?')) return;
+  const handleDelete = () => {
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const executeDelete = async () => {
     const token = getValidToken();
     if (!token) return;
     setIsSubmitting(true);
@@ -210,6 +215,15 @@ export default function RatingModal({
           )}
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={executeDelete}
+        title="Remove Rating"
+        message="Are you sure you want to remove your rating?"
+        confirmText="Remove"
+        variant="danger"
+      />
     </div>
   );
 }

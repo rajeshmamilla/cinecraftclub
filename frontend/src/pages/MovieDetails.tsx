@@ -239,7 +239,7 @@ export default function MovieDetails() {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        toast.error('Removed from Watchlist', { description: title, icon: '🗑️' });
+        toast.error('Removed from Watchlist', { description: title });
       } else {
         await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
@@ -254,7 +254,7 @@ export default function MovieDetails() {
             releaseDate: movie?.release_date || movie?.first_air_date
           })
         });
-        toast.success('Added to Watchlist! 🎬', { description: title, icon: '✅' });
+        toast.success('Added to Watchlist', { description: title });
       }
     } catch (e) { setInWatchlist(prev); toast.error('Something went wrong.'); }
   };

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/resizable";
 import MovieInfoPanel from '@/components/groups/MovieInfoPanel';
 import TrendingKeywords from '@/components/groups/TrendingKeywords';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
 
 interface Message { 
   id: number; 
@@ -76,6 +77,8 @@ export default function GroupChat() {
   const [hoveredMsg, setHoveredMsg] = useState<number | null>(null);
   const [movieInfo, setMovieInfo] = useState<any>(null);
   const [showReportMenu, setShowReportMenu] = useState(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
+  const [messageToUnsend, setMessageToUnsend] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Decode current user from JWT
@@ -191,8 +194,14 @@ export default function GroupChat() {
     } catch {}
   };
 
-  const handleUnsend = async (msgId: number) => {
-    if (!confirm('Unsend this message?')) return;
+  const handleUnsend = (msgId: number) => {
+    setMessageToUnsend(msgId);
+  };
+
+  const confirmUnsend = async () => {
+    if (messageToUnsend === null) return;
+    const msgId = messageToUnsend;
+    setMessageToUnsend(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/groups/messages/${msgId}`, {
         method: 'DELETE',
@@ -209,8 +218,12 @@ export default function GroupChat() {
     }
   };
 
-  const leaveGroup = async () => {
-    if (!confirm('Leave this group?')) return;
+  const leaveGroup = () => {
+    setIsLeaveConfirmOpen(true);
+  };
+
+  const confirmLeaveGroup = async () => {
+    setIsLeaveConfirmOpen(false);
     await fetch(`${API_BASE_URL}/api/groups/${id}/leave`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     navigate('/groups');
   };
@@ -228,7 +241,7 @@ export default function GroupChat() {
         // Refresh sidebar
         fetch(`${API_BASE_URL}/api/groups`, { headers: { Authorization: `Bearer ${token}` } })
           .then(r => r.ok ? r.json() : []).then(setUserGroups).catch(console.error);
-        toast.success("Successfully joined the group! 🎉");
+        toast.success("Successfully joined the group!");
       } else {
         toast.error("Failed to join group.");
       }
@@ -245,7 +258,7 @@ export default function GroupChat() {
     const message = `🎬 Join our discussion group "${group.name}" for "${group.movieTitle}" on CineCraftClub!${keywordText}\n\n👉 Join here: ${inviteLink}\nGroup ID: ${group.id}`;
 
     navigator.clipboard.writeText(message)
-      .then(() => toast.success("Invite link and custom message copied to clipboard! 📋"))
+      .then(() => toast.success("Invite link and custom message copied to clipboard!"))
       .catch(() => toast.error("Failed to copy invite link."));
   };
 
@@ -393,7 +406,7 @@ export default function GroupChat() {
                 <div className="absolute right-0 top-11 w-36 bg-background border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   <button
                     onClick={() => {
-                      toast.success("Group reported successfully! 🛡️");
+                      toast.success("Group reported successfully!");
                       setShowReportMenu(false);
                     }}
                     className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors"
@@ -595,6 +608,26 @@ export default function GroupChat() {
         </ResizablePanel>
 
       </ResizablePanelGroup>
+
+      <ConfirmationModal
+        isOpen={isLeaveConfirmOpen}
+        onClose={() => setIsLeaveConfirmOpen(false)}
+        onConfirm={confirmLeaveGroup}
+        title="Leave Group"
+        message="Are you sure you want to leave this group?"
+        confirmText="Leave"
+        variant="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={messageToUnsend !== null}
+        onClose={() => setMessageToUnsend(null)}
+        onConfirm={confirmUnsend}
+        title="Unsend Message"
+        message="Are you sure you want to unsend this message? This action cannot be undone."
+        confirmText="Unsend"
+        variant="danger"
+      />
     </div>
   );
 }
