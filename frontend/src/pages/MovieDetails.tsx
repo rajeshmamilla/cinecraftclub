@@ -22,6 +22,7 @@ interface Review {
 }
 import { getValidToken } from '../utils/auth';
 import RatingModal from '../components/movie/RatingModal';
+import CreateGroupModal from '../components/groups/CreateGroupModal';
 import MovieCard from '../components/movie/MovieCard';
 
 interface GroupResponse {
@@ -58,6 +59,7 @@ export default function MovieDetails() {
   const [isLoading, setIsLoading] = useState(true);
   const [userRating, setUserRating] = useState<number>(0);
   const [isRatingOpen, setIsRatingOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [recommendations, setRecommendations] = useState<Movie[]>([]);
   const [recsLoading, setRecsLoading] = useState(true);
 
@@ -329,6 +331,14 @@ export default function MovieDetails() {
         }}
       />
 
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onSuccess={(groupId) => navigate(`/group/${groupId}`)}
+        initialMovie={movie}
+      />
+
       <section className="relative w-full">
         <div className="absolute inset-0 h-[60vh] md:h-[80vh] w-full z-0">
           <img
@@ -426,7 +436,10 @@ export default function MovieDetails() {
                 )}
                 <div className="w-1 h-1 bg-border rounded-full" />
                 <button
-                  onClick={() => token ? navigate('/dashboard?tab=groups') : navigate('/')}
+                  onClick={() => {
+                    if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
+                    setIsCreateGroupOpen(true);
+                  }}
                   className="flex items-center space-x-1.5 px-3 py-1 rounded-full border border-border bg-secondary/80 hover:bg-secondary text-foreground hover:text-primary hover:border-primary transition-all font-semibold text-sm group"
                 >
                   <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
