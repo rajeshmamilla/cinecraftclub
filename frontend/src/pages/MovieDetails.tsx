@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film } from 'lucide-react';
+import { Star, MessageSquare, Clock, Calendar, Users, User, Plus, LogIn, CheckCircle, Check, Lock, Film, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMediaDetails, getImageUrl, getRecommendations } from '../services/tmdb';
 import type { MovieDetails as MovieDetailsType, Movie } from '../services/tmdb';
@@ -80,6 +80,7 @@ export default function MovieDetails() {
   const [c3RecRatings, setC3RecRatings] = useState<Record<number, number>>({});
 
   const token = getValidToken();
+  const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
     const fetchC3Average = async () => {
@@ -657,9 +658,18 @@ export default function MovieDetails() {
                         <span>{group.memberCount} member{group.memberCount !== 1 ? 's' : ''}</span>
                       </span>
                       {group.isMember && (
-                        <span className="text-[10px] text-green-400 flex items-center space-x-1 font-medium">
-                          <CheckCircle className="w-3 h-3" />
-                          <span>Joined</span>
+                        <span className={`text-[10px] ${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} flex items-center space-x-1 font-medium`}>
+                          {currentUser && group.createdBy === currentUser ? (
+                            <>
+                              <Shield className="w-3 h-3" />
+                              <span>Admin</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Joined</span>
+                            </>
+                          )}
                         </span>
                       )}
                     </div>
@@ -686,7 +696,9 @@ export default function MovieDetails() {
                       <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2 mb-2">{group.description}</p>
                     )}
                     <p className="text-[10px] text-muted-foreground">
-                      Created by: <span className="font-semibold text-foreground">{group.createdBy}</span>
+                      Created by: <span className="font-semibold text-foreground">
+                        {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                      </span>
                     </p>
                   </div>
 

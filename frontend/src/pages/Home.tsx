@@ -33,6 +33,8 @@ export default function Home() {
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
   const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
   const navigate = useNavigate();
+  const token = getValidToken();
+  const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
     const fetchC3Ratings = async () => {
@@ -338,12 +340,14 @@ export default function Home() {
                 </div>
                 
                 <div className="flex items-center justify-between pt-4 border-t border-border/50 text-xs text-muted-foreground mt-auto">
-                  <span>Created by: <span className="font-semibold text-foreground">{group.createdBy}</span></span>
+                  <span>Created by: <span className="font-semibold text-foreground">
+                    {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                  </span></span>
                   {joiningGroupId === group.id ? (
                     <span className="text-primary animate-pulse font-medium">Processing...</span>
                   ) : group.isMember ? (
-                    <span className="text-green-400 font-medium flex items-center space-x-1">
-                      <span>Joined</span>
+                    <span className={`${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} font-medium flex items-center space-x-1`}>
+                      <span>{currentUser && group.createdBy === currentUser ? 'Admin' : 'Joined'}</span>
                     </span>
                   ) : group.isPrivate ? (
                     group.joinRequestStatus === 'PENDING' ? (
