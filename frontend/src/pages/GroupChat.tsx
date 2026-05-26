@@ -115,6 +115,7 @@ export default function GroupChat() {
                     id: data.id,
                     title: data.title || data.name || '',
                     posterPath: data.poster_path,
+                    backdropPath: data.backdrop_path,
                     releaseDate: data.release_date || data.first_air_date,
                     voteAverage: data.vote_average,
                     overview: data.overview,
@@ -130,6 +131,7 @@ export default function GroupChat() {
                         id: tvData.id,
                         title: tvData.title || tvData.name || '',
                         posterPath: tvData.poster_path,
+                        backdropPath: tvData.backdrop_path,
                         releaseDate: tvData.release_date || tvData.first_air_date,
                         voteAverage: tvData.vote_average,
                         overview: tvData.overview,
@@ -254,7 +256,7 @@ export default function GroupChat() {
     if (!group) return;
     const trends = group.trendingKeywords?.slice(0, 3).map(k => `#${k.keyword}`).join(', ');
     const keywordText = trends ? ` We're currently discussing topics like: ${trends}.` : '';
-    const inviteLink = `${window.location.origin}/group/${group.id}`;
+    const inviteLink = `https://c3cinema.vercel.app/group/${group.id}`;
     const message = `🎬 Join our discussion group "${group.name}" for "${group.movieTitle}" on CineCraftClub!${keywordText}\n\n👉 Join here: ${inviteLink}\nGroup ID: ${group.id}`;
 
     navigator.clipboard.writeText(message)
@@ -377,16 +379,22 @@ export default function GroupChat() {
               <button onClick={() => navigate('/groups')} className="p-1.5 hover:bg-secondary rounded-full md:hidden">
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div className="w-14 h-9 rounded overflow-hidden border border-border shrink-0">
-                <img src={getImageUrl(group.moviePoster, 'w185')} alt="" className="w-full h-full object-cover" />
+              <div className="w-16 h-10 rounded overflow-hidden border border-border shrink-0 bg-secondary/30">
+                <img 
+                  src={getImageUrl(movieInfo?.backdropPath || group.moviePoster, 'w185')} 
+                  alt="" 
+                  className="w-full h-full object-cover" 
+                />
               </div>
               <div>
                 <h2 className="font-bold text-sm leading-tight">{group.name}</h2>
-                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className="text-primary font-semibold">{group.focus}</span>
                   <span>·</span>
                   <Users className="w-3 h-3" />
                   <span>{group.memberCount} members</span>
+                  <span>·</span>
+                  <span className="bg-secondary px-1.5 py-0.2 rounded font-mono text-[10px] tracking-tight">ID: {group.id}</span>
                 </div>
               </div>
             </div>
