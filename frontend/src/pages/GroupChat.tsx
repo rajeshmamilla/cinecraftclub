@@ -332,7 +332,7 @@ export default function GroupChat() {
         {/* ── LEFT SIDEBAR ── */}
         <ResizablePanel defaultSize={20} className="border-r border-border bg-secondary/5 hidden md:flex flex-col h-full shrink-0" id="sidebar">
           <div className="px-4 py-3 border-b border-border">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">My Groups</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">My Groups</p>
           </div>
           <div className="flex-1 overflow-y-auto py-1">
             {userGroups.length === 0 && (
@@ -350,10 +350,10 @@ export default function GroupChat() {
                   <img src={getImageUrl(g.moviePoster, 'w185')} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate leading-tight ${String(g.id) === id ? 'text-primary' : ''}`}>{g.name}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{g.movieTitle}</p>
+                  <p className={`text-base font-semibold truncate leading-tight ${String(g.id) === id ? 'text-primary' : ''}`}>{g.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{g.movieTitle}</p>
                   {g.focus && (
-                    <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider mt-0.5 inline-block">{g.focus}</span>
+                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider mt-1 inline-block">{g.focus}</span>
                   )}
                 </div>
               </button>
@@ -362,9 +362,9 @@ export default function GroupChat() {
           <div className="p-3 border-t border-border">
             <button
               onClick={() => navigate('/groups')}
-              className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-primary py-2 rounded-lg hover:bg-secondary/50 transition-colors"
+              className="w-full flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-primary py-2.5 rounded-lg hover:bg-secondary/50 transition-colors"
             >
-              <Hash className="w-3 h-3" /><span>Browse All Groups</span>
+              <Hash className="w-3.5 h-3.5" /><span>Browse All Groups</span>
             </button>
           </div>
         </ResizablePanel>
@@ -387,14 +387,14 @@ export default function GroupChat() {
                 />
               </div>
               <div>
-                <h2 className="font-bold text-sm leading-tight">{group.name}</h2>
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="text-primary font-semibold">{group.focus}</span>
+                <h2 className="font-bold text-base md:text-lg leading-tight">{group.name}</h2>
+                <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                  <span className="text-primary font-semibold text-xs md:text-sm">{group.focus}</span>
                   <span>·</span>
-                  <Users className="w-3 h-3" />
+                  <Users className="w-3.5 h-3.5" />
                   <span>{group.memberCount} members</span>
                   <span>·</span>
-                  <span className="bg-secondary px-1.5 py-0.2 rounded font-mono text-[10px] tracking-tight">ID: {group.id}</span>
+                  <span className="bg-secondary px-2 py-0.5 rounded font-mono text-xs tracking-tight">ID: {group.id}</span>
                 </div>
               </div>
             </div>
@@ -434,8 +434,8 @@ export default function GroupChat() {
             {/* Movie Synopsis Banner */}
             {movieInfo?.overview && (
               <div className="flex justify-center mb-4">
-                <div className="bg-secondary/40 rounded-2xl px-5 py-3 text-xs text-muted-foreground border border-border/30 max-w-2xl leading-relaxed">
-                  <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                <div className="bg-secondary/40 rounded-2xl px-5 py-3 text-sm text-muted-foreground border border-border/30 max-w-2xl leading-relaxed">
+                  <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                     <Info className="w-3.5 h-3.5" />
                     <span>Synopsis</span>
                   </div>
@@ -579,7 +579,7 @@ export default function GroupChat() {
             <MovieInfoPanel movieInfo={movieInfo} />
 
             <div className="p-4">
-              <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-widest text-primary">
+              <div className="flex items-center gap-2 mb-4 text-sm font-bold uppercase tracking-widest text-primary">
                 <Users className="w-4 h-4" />
                 <span>Members ({group.members?.length || 0})</span>
               </div>
@@ -594,8 +594,8 @@ export default function GroupChat() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-foreground truncate">{m.fullName || m.username}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">@{m.username}</p>
+                      <p className="text-sm font-bold text-foreground truncate">{m.fullName || m.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{m.username}</p>
                     </div>
                   </div>
                 ))}
@@ -605,7 +605,7 @@ export default function GroupChat() {
               <div className="border-t border-border/30 pt-4 mt-4">
                 <button
                   onClick={handleInvite}
-                  className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
+                  className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02]"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Invite Friends</span>
