@@ -75,7 +75,6 @@ export default function GroupChat() {
   const [movieInfo, setMovieInfo] = useState<any>(null);
   const [showReportMenu, setShowReportMenu] = useState(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = useState(false);
-  const [messageToUnsend, setMessageToUnsend] = useState<number | null>(null);
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -175,6 +174,10 @@ export default function GroupChat() {
             }
           });
           setReactions(reactionMap);
+
+          // Mark all messages as read for this group in local storage
+          localStorage.setItem(`readCount_${id}`, msgs.length.toString());
+          window.dispatchEvent(new Event('storage'));
         }
       } catch {} finally { setIsLoading(false); }
     };
@@ -199,27 +202,30 @@ export default function GroupChat() {
       });
       if (r.ok) { 
         const sent = await r.json(); 
-        setMessages(p => [...p, sent]); 
+        setMessages(p => {
+          const updated = [...p, sent];
+          localStorage.setItem(`readCount_${id}`, updated.length.toString());
+          window.dispatchEvent(new Event('storage'));
+          return updated;
+        }); 
         setNewMessage(''); 
       }
     } catch {}
   };
 
-  const handleUnsend = (msgId: number) => {
-    setMessageToUnsend(msgId);
-  };
-
-  const confirmUnsend = async () => {
-    if (messageToUnsend === null) return;
-    const msgId = messageToUnsend;
-    setMessageToUnsend(null);
+  const handleUnsend = async (msgId: number) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/groups/messages/${msgId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== msgId));
+        setMessages(prev => {
+          const updated = prev.filter(m => m.id !== msgId);
+          localStorage.setItem(`readCount_${id}`, updated.length.toString());
+          window.dispatchEvent(new Event('storage'));
+          return updated;
+        });
         toast.success("Message unsent.");
       } else {
         toast.error("Failed to unsend message.");
@@ -805,16 +811,6 @@ export default function GroupChat() {
         title="Leave Group"
         message="Are you sure you want to leave this group?"
         confirmText="Leave"
-        variant="danger"
-      />
-
-      <ConfirmationModal
-        isOpen={messageToUnsend !== null}
-        onClose={() => setMessageToUnsend(null)}
-        onConfirm={confirmUnsend}
-        title="Unsend Message"
-        message="Are you sure you want to unsend this message? This action cannot be undone."
-        confirmText="Unsend"
         variant="danger"
       />
     </div>

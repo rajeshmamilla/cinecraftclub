@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../../config';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Search, Clapperboard, User, X, Bookmark } from 'lucide-react';
+import { Search, Clapperboard, User, X, Bookmark, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import { searchMulti, getImageUrl } from '../../services/tmdb';
 import type { Movie } from '../../services/tmdb';
@@ -27,6 +27,7 @@ export default function Navbar() {
   const [forgotSuccessMessage, setForgotSuccessMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [notificationCount, setNotificationCount] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,6 +58,63 @@ export default function Navbar() {
     window.addEventListener('storage', checkAuth);
     return () => window.removeEventListener('storage', checkAuth);
   }, []);
+
+  useEffect(() => {
+    const token = getValidToken();
+    if (!token) {
+      setNotificationCount(0);
+      return;
+    }
+
+    const fetchNotifications = async () => {
+      try {
+        const [groupsRes, requestsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/groups`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups/requests?status=PENDING`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        let unreadGroups = 0;
+        let pendingRequests = 0;
+
+        if (groupsRes.ok) {
+          const groups = await groupsRes.json();
+          groups.forEach((g: any) => {
+            const readCountStr = localStorage.getItem(`readCount_${g.id}`);
+            if (readCountStr === null) {
+              localStorage.setItem(`readCount_${g.id}`, g.messageCount.toString());
+            } else {
+              const readCount = parseInt(readCountStr, 10);
+              if (g.messageCount > readCount) {
+                unreadGroups += 1;
+              }
+            }
+          });
+        }
+
+        if (requestsRes.ok) {
+          const requests = await requestsRes.json();
+          pendingRequests = requests.length;
+        }
+
+        setNotificationCount(unreadGroups + pendingRequests);
+      } catch (e) {
+        console.error("Failed to fetch notifications", e);
+      }
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 5000);
+
+    const handleStorageChange = () => {
+      fetchNotifications();
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [isLoggedIn]);
 
   useEffect(() => {
     // If there is a pending group invite and the user is not logged in, open the auth modal immediately
@@ -381,12 +439,28 @@ export default function Navbar() {
           </div>
           
           {isLoggedIn ? (
-            <Link 
-              to="/dashboard"
-              className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold hover:bg-primary/80 transition-colors"
-            >
-              {username ? username.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
-            </Link>
+            <>
+              {/* Notification Bell Icon */}
+              <Link
+                to="/dashboard?tab=requests"
+                className="relative p-2 rounded-full bg-secondary hover:bg-secondary/80 hover:text-primary transition-all cursor-pointer flex items-center justify-center text-foreground"
+                title="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white font-black text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-background animate-in zoom-in duration-200">
+                    {notificationCount}
+                  </span>
+                )}
+              </Link>
+
+              <Link 
+                to="/dashboard"
+                className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold hover:bg-primary/80 transition-colors"
+              >
+                {username ? username.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
+              </Link>
+            </>
           ) : (
             <button 
               onClick={() => setIsAuthModalOpen(true)}

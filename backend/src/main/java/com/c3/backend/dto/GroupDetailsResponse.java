@@ -28,6 +28,7 @@ public class GroupDetailsResponse {
     @JsonProperty("isMember")
     private boolean isMember;
     private String joinRequestStatus;
+    private long messageCount;
     
     private List<KeywordCountResponse> trendingKeywords;
     private List<MemberResponse> members;
