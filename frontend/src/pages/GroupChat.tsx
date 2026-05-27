@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Users, ArrowLeft, MoreVertical, Hash, Plus, Info, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Send, Users, ArrowLeft, MoreVertical, Hash, Plus, Info, ChevronLeft, ChevronRight, X, Lock, Clock, XCircle } from 'lucide-react';
 import { getImageUrl } from '../services/tmdb';
 import { toast } from 'sonner';
 import MovieInfoPanel from '@/components/groups/MovieInfoPanel';
@@ -34,6 +34,8 @@ interface Group {
   focus: string; 
   description: string; 
   memberCount: number; 
+  isPrivate?: boolean;
+  joinRequestStatus?: 'PENDING' | 'APPROVED' | 'DENIED' | null;
   trendingKeywords?: Keyword[];
   members?: Member[];
   isMember?: boolean;
@@ -256,6 +258,24 @@ export default function GroupChat() {
       }
     } catch (e) {
       toast.error("Failed to join group.");
+    }
+  };
+
+  const requestToJoin = async () => {
+    if (!token) return;
+    try {
+      const r = await fetch(`${API_BASE_URL}/api/groups/${id}/request`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (r.ok) {
+        toast.success("Request to join private group sent to the admin.");
+        setGroup(prev => prev ? { ...prev, joinRequestStatus: 'PENDING' } : null);
+      } else {
+        toast.error("Failed to send join request.");
+      }
+    } catch (e) {
+      toast.error("Failed to send join request.");
     }
   };
 
@@ -495,98 +515,130 @@ export default function GroupChat() {
         <TrendingKeywords keywords={group.trendingKeywords} />
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-thin scrollbar-thumb-primary/20">
-          {/* Movie Synopsis Banner */}
-          {movieInfo?.overview && (
-            <div className="flex justify-center mb-4">
-              <div className="bg-secondary/40 rounded-2xl px-5 py-3 text-sm text-muted-foreground border border-border/30 max-w-2xl leading-relaxed">
-                <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
-                  <Info className="w-3.5 h-3.5" />
-                  <span>Synopsis</span>
-                </div>
-                <p>{movieInfo.overview}</p>
-              </div>
+        {group.isPrivate && !group.isMember ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-secondary/5 animate-float-in">
+            <div className="w-16 h-16 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center text-primary mb-6 animate-pulse">
+              <Lock className="w-8 h-8" />
             </div>
-          )}
-
-          {messages.map(msg => {
-            const isOwn = msg.username === currentUser;
-            const msgR = reactions[msg.id] || {};
-            return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}
-                onMouseEnter={() => setHoveredMsg(msg.id)}
-                onMouseLeave={() => setHoveredMsg(null)}
+            <h3 className="text-xl font-bold mb-2">This Group is Private</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              Only approved members can view chat messages, keywords, or participate. Please request access from the administrator to join.
+            </p>
+            {group.joinRequestStatus === 'PENDING' ? (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-xs px-4 py-2 rounded-xl font-bold flex items-center space-x-1.5">
+                <Clock className="w-4 h-4 animate-spin-slow" />
+                <span>Your request to join is pending approval</span>
+              </div>
+            ) : group.joinRequestStatus === 'DENIED' ? (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs px-4 py-2 rounded-xl font-bold flex items-center space-x-1.5">
+                <XCircle className="w-4 h-4" />
+                <span>Your request to join was declined</span>
+              </div>
+            ) : (
+              <button
+                onClick={requestToJoin}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-lg shadow-primary/10 cursor-pointer"
               >
-                {!isOwn && (
-                  <span className="text-[10px] font-bold text-primary mb-0.5 ml-2 uppercase tracking-tight">{msg.username}</span>
-                )}
-                <div className="relative max-w-[65%]">
-                  {/* Emoji picker on hover */}
-                  {hoveredMsg === msg.id && (
-                    <div className={`absolute -top-9 ${isOwn ? 'right-0' : 'left-0'} z-30`}>
-                      <div className="bg-secondary border border-border/60 rounded-full flex items-center px-2.5 py-1 gap-1.5 shadow-xl">
-                        <div className="flex items-center gap-0.5">
-                          {EMOJIS.map(e => (
-                            <button
-                              key={e}
-                              onMouseDown={ev => { ev.preventDefault(); toggleReaction(msg.id, e); }}
-                              className="text-base hover:scale-125 transition-transform px-0.5 cursor-pointer"
-                            >{e}</button>
-                          ))}
-                        </div>
-                        {isOwn && (
-                          <>
-                            <div className="w-[1.5px] h-3.5 bg-border/80" />
-                            <button
-                              onMouseDown={ev => { ev.preventDefault(); handleUnsend(msg.id); }}
-                              className="text-[10px] font-bold text-red-500 hover:text-red-400 px-1 uppercase tracking-wider transition-colors cursor-pointer"
-                            >
-                              Unsend
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`px-4 py-2.5 rounded-2xl text-[15px] md:text-base leading-relaxed whitespace-pre-wrap shadow-sm transition-all duration-200 hover:shadow-md ${
-                    isOwn
-                      ? 'bg-primary text-primary-foreground rounded-tr-sm font-medium'
-                      : 'bg-secondary text-foreground rounded-tl-sm border border-border/40'
-                  }`}>
-                    {msg.content}
+                Request to Join Group
+              </button>
+            )}
+          </div>
+        ) : (
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scrollbar-thin scrollbar-thumb-primary/20">
+            {/* Movie Synopsis Banner */}
+            {movieInfo?.overview && (
+              <div className="flex justify-center mb-4">
+                <div className="bg-secondary/40 rounded-2xl px-5 py-3 text-sm text-muted-foreground border border-border/30 max-w-2xl leading-relaxed">
+                  <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>Synopsis</span>
                   </div>
-
-                  {/* Reaction counts */}
-                  {Object.keys(msgR).length > 0 && (
-                    <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                      {Object.entries(msgR).map(([emoji, users]) => users.length > 0 && (
-                        <button
-                          key={emoji}
-                          onClick={() => toggleReaction(msg.id, emoji)}
-                          title={users.join(', ')}
-                          className={`flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full border transition-all duration-200 cursor-pointer ${
-                            users.includes(currentUser)
-                              ? 'bg-primary/20 border-primary/50 text-primary scale-105'
-                              : 'bg-secondary border-border hover:bg-secondary/80'
-                          }`}
-                        >
-                          <span>{emoji}</span><span className="font-semibold">{users.length}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <span className={`text-[10px] opacity-40 mt-0.5 block ${isOwn ? 'text-right' : 'text-left'}`}>
-                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <p>{movieInfo.overview}</p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            )}
+
+            {messages.map(msg => {
+              const isOwn = msg.username === currentUser;
+              const msgR = reactions[msg.id] || {};
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}
+                  onMouseEnter={() => setHoveredMsg(msg.id)}
+                  onMouseLeave={() => setHoveredMsg(null)}
+                >
+                  {!isOwn && (
+                    <span className="text-[10px] font-bold text-primary mb-0.5 ml-2 uppercase tracking-tight">{msg.username}</span>
+                  )}
+                  <div className="relative max-w-[65%]">
+                    {/* Emoji picker on hover */}
+                    {hoveredMsg === msg.id && (
+                      <div className={`absolute -top-9 ${isOwn ? 'right-0' : 'left-0'} z-30`}>
+                        <div className="bg-secondary border border-border/60 rounded-full flex items-center px-2.5 py-1 gap-1.5 shadow-xl">
+                          <div className="flex items-center gap-0.5">
+                            {EMOJIS.map(e => (
+                              <button
+                                key={e}
+                                onMouseDown={ev => { ev.preventDefault(); toggleReaction(msg.id, e); }}
+                                className="text-base hover:scale-125 transition-transform px-0.5 cursor-pointer"
+                              >{e}</button>
+                            ))}
+                          </div>
+                          {isOwn && (
+                            <>
+                              <div className="w-[1px] h-4 bg-border/60 mx-1" />
+                              <button
+                                onMouseDown={ev => { ev.preventDefault(); handleUnsend(msg.id); }}
+                                className="text-[10px] font-bold text-red-500 hover:text-red-400 px-1 cursor-pointer"
+                              >Unsend</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`p-3 rounded-2xl text-[15px] ${
+                      isOwn 
+                        ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                        : 'bg-secondary border border-border/40 rounded-tl-none text-foreground'
+                    }`}>
+                      <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.content}</p>
+
+                      {/* Reactions display */}
+                      {Object.keys(msgR).length > 0 && (
+                        <div className={`flex flex-wrap gap-1 mt-1.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                          {Object.entries(msgR).map(([emoji, users]) => {
+                            const hasReacted = users.includes(currentUser);
+                            return (
+                              <button
+                                key={emoji}
+                                onClick={() => toggleReaction(msg.id, emoji)}
+                                className={`flex items-center space-x-1 px-1.5 py-0.5 rounded-full text-xs border transition-all ${
+                                  hasReacted 
+                                    ? 'bg-primary/20 border-primary text-primary font-bold' 
+                                    : 'bg-secondary/40 border-border/60 text-muted-foreground hover:bg-secondary/80'
+                                } cursor-pointer`}
+                                title={users.join(', ')}
+                              >
+                                <span>{emoji}</span>
+                                {users.length > 1 && <span className="text-[10px]">{users.length}</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <span className={`text-[10px] opacity-40 mt-0.5 block ${isOwn ? 'text-right' : 'text-left'}`}>
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Input */}
         <div className="px-4 py-4 border-t border-border bg-background/50 shrink-0">
@@ -621,16 +673,47 @@ export default function GroupChat() {
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-foreground">You are not a member of this group</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Join this group to participate and write messages.</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {group.isPrivate ? "Private Group" : "You are not a member of this group"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {group.isPrivate 
+                      ? "Membership approval is required to view and send messages." 
+                      : "Join this group to participate and write messages."}
+                  </p>
                 </div>
               </div>
-              <button
-                onClick={joinGroup}
-                className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-bold text-sm transition-all hover:scale-[1.02] shrink-0 cursor-pointer"
-              >
-                Join Group
-              </button>
+              {group.isPrivate ? (
+                group.joinRequestStatus === 'PENDING' ? (
+                  <button
+                    disabled
+                    className="w-full sm:w-auto bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 px-6 py-2 rounded-lg font-bold text-sm cursor-not-allowed shrink-0"
+                  >
+                    Pending
+                  </button>
+                ) : group.joinRequestStatus === 'DENIED' ? (
+                  <button
+                    disabled
+                    className="w-full sm:w-auto bg-red-500/20 text-red-500 border border-red-500/30 px-6 py-2 rounded-lg font-bold text-sm cursor-not-allowed shrink-0"
+                  >
+                    Denied
+                  </button>
+                ) : (
+                  <button
+                    onClick={requestToJoin}
+                    className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-bold text-sm transition-all hover:scale-[1.02] shrink-0 cursor-pointer"
+                  >
+                    Request Access
+                  </button>
+                )
+              ) : (
+                <button
+                  onClick={joinGroup}
+                  className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2 rounded-lg font-bold text-sm transition-all hover:scale-[1.02] shrink-0 cursor-pointer"
+                >
+                  Join Group
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -662,40 +745,48 @@ export default function GroupChat() {
         <div className="flex-1 overflow-y-auto divide-y divide-border/20 scrollbar-none">
           <MovieInfoPanel movieInfo={movieInfo} />
 
-          <div className="p-4 bg-background lg:bg-transparent">
-            <div className="flex items-center gap-2 mb-4 text-sm font-bold uppercase tracking-widest text-primary">
-              <Users className="w-4 h-4" />
-              <span>Members ({group.members?.length || 0})</span>
-            </div>
-            <div className="space-y-2 mb-4">
-              {group.members?.map((m: any) => (
-                <div key={m.username} className="flex items-center gap-2 px-3 py-2 hover:bg-secondary/40 rounded-xl transition-all border border-transparent hover:border-border/30">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs uppercase overflow-hidden shrink-0">
-                    {m.profilePicUrl ? (
-                      <img src={m.profilePicUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span>{m.username.substring(0, 2)}</span>
-                    )}
+          {(!group.isPrivate || group.isMember) ? (
+            <div className="p-4 bg-background lg:bg-transparent">
+              <div className="flex items-center gap-2 mb-4 text-sm font-bold uppercase tracking-widest text-primary">
+                <Users className="w-4 h-4" />
+                <span>Members ({group.members?.length || 0})</span>
+              </div>
+              <div className="space-y-2 mb-4">
+                {group.members?.map((m: any) => (
+                  <div key={m.username} className="flex items-center gap-2 px-3 py-2 hover:bg-secondary/40 rounded-xl transition-all border border-transparent hover:border-border/30">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs uppercase overflow-hidden shrink-0">
+                      {m.profilePicUrl ? (
+                        <img src={m.profilePicUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{m.username.substring(0, 2)}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{m.fullName || m.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{m.username}</p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-foreground truncate">{m.fullName || m.username}</p>
-                    <p className="text-xs text-muted-foreground truncate">@{m.username}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Invite button */}
-            <div className="border-t border-border/30 pt-4 mt-4">
-              <button
-                onClick={handleInvite}
-                className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Invite Friends</span>
-              </button>
+              {/* Invite button */}
+              <div className="border-t border-border/30 pt-4 mt-4">
+                <button
+                  onClick={handleInvite}
+                  className="w-full flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Invite Friends</span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-6 text-center text-xs text-muted-foreground bg-background lg:bg-transparent">
+              <Lock className="w-8 h-8 mx-auto mb-2 opacity-40 text-primary animate-pulse" />
+              <p className="font-semibold text-foreground mb-1">Members List Hidden</p>
+              <p>Join this private group to view the members list.</p>
+            </div>
+          )}
         </div>
       </div>
 

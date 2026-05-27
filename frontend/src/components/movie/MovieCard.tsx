@@ -36,7 +36,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
           }
         }
       } catch (e) {
-        console.error("Failed to fetch average rating", e);
+        // Silently catch fetch errors to avoid console spam when backend is down/restarting
       }
     };
 
@@ -59,7 +59,7 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
           setInWatchlist(isSaved);
         }
       } catch (e) {
-        console.error(e);
+        // Silently catch watchlist check errors
       } finally {
         setIsLoading(false);
       }

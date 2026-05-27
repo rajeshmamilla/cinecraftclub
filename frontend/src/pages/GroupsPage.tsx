@@ -27,6 +27,7 @@ export default function GroupsPage() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFocus, setSelectedFocus] = useState('All');
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
@@ -34,22 +35,28 @@ export default function GroupsPage() {
   const token = getValidToken();
   const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
-  useEffect(() => {
-    const fetchGroups = async (showSkeleton = true) => {
-      const token = getValidToken(); // always read fresh
-      if (showSkeleton) setIsLoading(true);
-      try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
-        if (res.ok) setGroups(await res.json());
-      } catch (e) {
-        console.error(e);
-      } finally {
-        if (showSkeleton) setIsLoading(false);
+  const fetchGroups = async (showSkeleton = true) => {
+    const token = getValidToken(); // always read fresh
+    if (showSkeleton) setIsLoading(true);
+    setError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
+      if (res.ok) {
+        setGroups(await res.json());
+      } else {
+        setError("There is an issue from the server side. Please contact support at: rajeshmamilla206@gmail.com");
       }
-    };
+    } catch (e) {
+      console.error(e);
+      setError("There is an issue from the server side. Please contact support at: rajeshmamilla206@gmail.com");
+    } finally {
+      if (showSkeleton) setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchGroups(true);
 
     // Re-fetch when user tabs back — catches join-state changes silently in the background
@@ -165,6 +172,22 @@ export default function GroupsPage() {
           {[1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className="bg-secondary/30 border border-border rounded-2xl h-64 animate-pulse" />
           ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-6">
+            <XCircle className="w-10 h-10" />
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Server Error</h2>
+          <p className="text-muted-foreground max-w-md">
+            {error}
+          </p>
+          <button
+            onClick={() => fetchGroups(true)}
+            className="mt-6 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-bold hover:bg-primary/90 transition-all"
+          >
+            Retry Connection
+          </button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">

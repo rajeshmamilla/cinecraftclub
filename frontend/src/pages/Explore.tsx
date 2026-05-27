@@ -2,7 +2,7 @@ import { API_BASE_URL } from '../config';
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { TrendingUp, RefreshCw } from 'lucide-react';
-import { getTrendingMovies, getPopularTeluguMovies } from '../services/tmdb';
+import { getTrendingMovies, getPopularTeluguMovies, getPopularMoviesByLanguage } from '../services/tmdb';
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 
@@ -39,7 +39,28 @@ export default function Explore() {
   }, [movies]);
   
   const isTrending = category === 'trending';
-  const title = isTrending ? 'Trending Globally' : 'Popular in Telugu Cinema';
+  
+  const getCategoryInfo = () => {
+    switch (category) {
+      case 'trending':
+        return { title: 'Trending Globally', emoji: null, langCode: null };
+      case 'telugu':
+        return { title: 'Popular in Telugu Cinema', emoji: '🔥', langCode: 'te' };
+      case 'tamil':
+        return { title: 'Popular in Tamil Cinema', emoji: '🎬', langCode: 'ta' };
+      case 'kannada':
+        return { title: 'Popular in Kannada Cinema', emoji: '⭐', langCode: 'kn' };
+      case 'malayalam':
+        return { title: 'Popular in Malayalam Cinema', emoji: '🎥', langCode: 'ml' };
+      case 'hindi':
+        return { title: 'Popular in Hindi Cinema', emoji: '🍿', langCode: 'hi' };
+      default:
+        return { title: 'Popular Cinema', emoji: '🎥', langCode: null };
+    }
+  };
+
+  const info = getCategoryInfo();
+  const title = info.title;
 
   useEffect(() => {
     // Reset state when category changes
@@ -55,7 +76,12 @@ export default function Explore() {
     if (isTrending) {
       newMovies = await getTrendingMovies(pageNum);
     } else {
-      newMovies = await getPopularTeluguMovies(pageNum);
+      const info = getCategoryInfo();
+      if (info.langCode) {
+        newMovies = await getPopularMoviesByLanguage(info.langCode, pageNum);
+      } else {
+        newMovies = await getPopularTeluguMovies(pageNum);
+      }
     }
     
     setMovies(prev => pageNum === 1 ? newMovies : [...prev, ...newMovies]);
@@ -75,7 +101,7 @@ export default function Explore() {
           {isTrending ? (
             <TrendingUp className="text-primary w-6 h-6" />
           ) : (
-            <span className="text-2xl">🔥</span>
+            <span className="text-2xl">{info.emoji || '🎥'}</span>
           )}
         </div>
         <div>
