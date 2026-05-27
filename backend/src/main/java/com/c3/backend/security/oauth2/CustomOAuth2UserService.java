@@ -35,21 +35,38 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             user = userOptional.get();
             user.setFullName(name);
             user.setProfilePicUrl(picture);
+            user.setEmailVerified(true);
             user = userRepository.save(user);
         } else {
             // Check if email already exists to link accounts or create a new unique username
-            String username = email != null ? email.split("@")[0] + "_" + providerId.substring(0, 5) : "user_" + providerId;
+            Optional<User> existingUserByEmail = Optional.empty();
+            if (email != null && !email.trim().isEmpty()) {
+                existingUserByEmail = userRepository.findByEmail(email);
+            }
             
-            user = User.builder()
-                    .username(username)
-                    .email(email)
-                    .fullName(name)
-                    .profilePicUrl(picture)
-                    .provider(provider)
-                    .providerId(providerId)
-                    .isActive(true)
-                    .build();
-            user = userRepository.save(user);
+            if (existingUserByEmail.isPresent()) {
+                user = existingUserByEmail.get();
+                user.setProvider(provider);
+                user.setProviderId(providerId);
+                user.setFullName(name);
+                user.setProfilePicUrl(picture);
+                user.setEmailVerified(true);
+                user = userRepository.save(user);
+            } else {
+                String username = email != null ? email.split("@")[0] + "_" + providerId.substring(0, 5) : "user_" + providerId;
+                
+                user = User.builder()
+                        .username(username)
+                        .email(email)
+                        .fullName(name)
+                        .profilePicUrl(picture)
+                        .provider(provider)
+                        .providerId(providerId)
+                        .isActive(true)
+                        .emailVerified(true)
+                        .build();
+                user = userRepository.save(user);
+            }
         }
 
         return new CustomUserDetails(user, oAuth2User.getAttributes());

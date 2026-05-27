@@ -67,20 +67,25 @@ export const getTrendingMovies = async (page: number = 1): Promise<Movie[]> => {
   }
 };
 
-export const getPopularTeluguMovies = async (page: number = 1): Promise<Movie[]> => {
+export const getPopularMoviesByLanguage = async (lang: string, page: number = 1): Promise<Movie[]> => {
   try {
     const response = await tmdbApi.get('/discover/movie', {
       params: {
-        with_original_language: 'te',
+        with_original_language: lang,
         sort_by: 'popularity.desc',
+        'vote_count.gte': 10,
         page
       }
     });
     return response.data.results;
   } catch (error) {
-    console.error("Error fetching Telugu movies:", error);
+    console.error(`Error fetching ${lang} movies:`, error);
     return [];
   }
+};
+
+export const getPopularTeluguMovies = async (page: number = 1): Promise<Movie[]> => {
+  return getPopularMoviesByLanguage('te', page);
 };
 
 export const getMediaDetails = async (id: string, type: 'movie' | 'tv' = 'movie'): Promise<MovieDetails | null> => {

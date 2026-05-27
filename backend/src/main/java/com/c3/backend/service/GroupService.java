@@ -155,6 +155,9 @@ public class GroupService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         MovieGroup group = getGroupEntity(groupId);
+        if (group.getIsPrivate()) {
+            throw new RuntimeException("Cannot directly join a private group. Please request to join.");
+        }
         group.getMembers().add(user);
         MovieGroup saved = groupRepository.save(group);
         return toResponse(saved, username);

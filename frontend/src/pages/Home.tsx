@@ -1,12 +1,13 @@
 import { API_BASE_URL } from '../config';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, MessageSquare, TrendingUp, Lock, Clock, XCircle } from 'lucide-react';
-import { getTrendingMovies, getPopularTeluguMovies, getImageUrl } from '../services/tmdb';
+import { MessageSquare, TrendingUp, Lock, Clock, XCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getTrendingMovies, getPopularTeluguMovies, getImageUrl, getPopularMoviesByLanguage } from '../services/tmdb';
 import MovieCard from '../components/movie/MovieCard';
 import type { Movie } from '../services/tmdb';
 import { getValidToken } from '../utils/auth';
 import { toast } from 'sonner';
+import CreateGroupModal from '../components/groups/CreateGroupModal';
 
 interface GroupResponse {
   id: string;
@@ -24,25 +25,140 @@ interface GroupResponse {
   joinRequestStatus?: 'PENDING' | 'APPROVED' | 'DENIED' | null;
 }
 
+interface MovieRowProps {
+  title: string;
+  emoji?: string;
+  icon?: React.ReactNode;
+  movies: Movie[];
+  c3Ratings: Record<number, number>;
+  onMoreClick: () => void;
+}
+
+function MovieRow({ title, emoji, icon, movies, c3Ratings, onMoreClick }: MovieRowProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [showLeft, setShowLeft] = useState(false);
+  const [showRight, setShowRight] = useState(true);
+
+  const checkScroll = () => {
+    const el = rowRef.current;
+    if (!el) return;
+    setShowLeft(el.scrollLeft > 5);
+    setShowRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 5);
+  };
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    checkScroll();
+    
+    const observer = new ResizeObserver(checkScroll);
+    observer.observe(el);
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [movies]);
+
+  const handleScroll = (dir: 'left' | 'right') => {
+    const el = rowRef.current;
+    if (!el) return;
+    const step = el.clientWidth * 0.75;
+    el.scrollBy({
+      left: dir === 'left' ? -step : step,
+      behavior: 'smooth'
+    });
+  };
+
+  if (movies.length === 0) return null;
+
+  return (
+    <section className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold flex items-center space-x-2">
+          {icon && <span className="text-primary">{icon}</span>}
+          {emoji && <span className="text-2xl">{emoji}</span>}
+          <span>{title}</span>
+        </h2>
+        <button
+          onClick={onMoreClick}
+          className="text-sm text-primary hover:underline flex items-center space-x-1 font-semibold group/more bg-transparent border-0 cursor-pointer"
+        >
+          <span>More</span>
+          <span className="transition-transform group-hover/more:translate-x-1 duration-200">→</span>
+        </button>
+      </div>
+
+      <div className="relative group/scroll-row">
+        {showLeft && (
+          <button
+            onClick={() => handleScroll('left')}
+            className="absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-background/80 backdrop-blur-md border border-border rounded-full flex items-center justify-center opacity-0 group-hover/scroll-row:opacity-100 transition-opacity shadow-lg hover:scale-110 hover:bg-secondary hover:text-primary cursor-pointer hidden md:flex"
+            aria-label="Scroll Left"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+
+        <div
+          ref={rowRef}
+          onScroll={checkScroll}
+          className="flex space-x-6 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+        >
+          {movies.map((movie) => (
+            <div
+              key={movie.id}
+              className="w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] shrink-0 snap-start"
+            >
+              <MovieCard movie={movie} c3Rating={c3Ratings[movie.id]} />
+            </div>
+          ))}
+        </div>
+
+        {showRight && (
+          <button
+            onClick={() => handleScroll('right')}
+            className="absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-background/80 backdrop-blur-md border border-border rounded-full flex items-center justify-center opacity-0 group-hover/scroll-row:opacity-100 transition-opacity shadow-lg hover:scale-110 hover:bg-secondary hover:text-primary cursor-pointer hidden md:flex"
+            aria-label="Scroll Right"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   const [trendingMovies, setTrendingMovies] = useState<Movie[]>([]);
   const [teluguMovies, setTeluguMovies] = useState<Movie[]>([]);
+  const [tamilMovies, setTamilMovies] = useState<Movie[]>([]);
+  const [kannadaMovies, setKannadaMovies] = useState<Movie[]>([]);
+  const [malayalamMovies, setMalayalamMovies] = useState<Movie[]>([]);
+  const [hindiMovies, setHindiMovies] = useState<Movie[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [groups, setGroups] = useState<GroupResponse[]>([]);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
   const [joiningGroupId, setJoiningGroupId] = useState<string | null>(null);
   const [c3Ratings, setC3Ratings] = useState<Record<number, number>>({});
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedMovieForGroup, setSelectedMovieForGroup] = useState<Movie | null>(null);
   const navigate = useNavigate();
   const token = getValidToken();
   const currentUser = token ? JSON.parse(atob(token.split('.')[1])).sub : null;
 
   useEffect(() => {
+    const movieIds = [
+      ...trendingMovies,
+      ...teluguMovies,
+      ...tamilMovies,
+      ...kannadaMovies,
+      ...malayalamMovies,
+      ...hindiMovies
+    ].map(m => m.id);
+    if (movieIds.length === 0) return;
+
     const fetchC3Ratings = async () => {
-      const movieIds = [
-        ...trendingMovies.map(m => m.id),
-        ...teluguMovies.map(m => m.id)
-      ];
-      if (movieIds.length === 0) return;
       try {
         const uniqueIds = Array.from(new Set(movieIds));
         const res = await fetch(`${API_BASE_URL}/api/ratings/movie/averages?ids=${uniqueIds.join(',')}`);
@@ -62,39 +178,54 @@ export default function Home() {
     };
 
     fetchC3Ratings();
-  }, [trendingMovies, teluguMovies]);
+  }, [trendingMovies, teluguMovies, tamilMovies, kannadaMovies, malayalamMovies, hindiMovies]);
 
   useEffect(() => {
     const fetchMovies = async () => {
-      const trending = await getTrendingMovies();
-      const telugu = await getPopularTeluguMovies();
+      const [trending, telugu, tamil, kannada, malayalam, hindi] = await Promise.all([
+        getTrendingMovies(),
+        getPopularTeluguMovies(),
+        getPopularMoviesByLanguage('ta'),
+        getPopularMoviesByLanguage('kn'),
+        getPopularMoviesByLanguage('ml'),
+        getPopularMoviesByLanguage('hi')
+      ]);
 
-      setTrendingMovies(trending.slice(0, 6)); // Show top 6 global trending
-      setTeluguMovies(telugu.slice(0, 6)); // Show top 6 telugu
+      setTrendingMovies(trending.slice(0, 12)); // Show top 12 global trending
+      setTeluguMovies(telugu.slice(0, 12)); // Show top 12 telugu movies
+      setTamilMovies(tamil.slice(0, 12)); // Show top 12 tamil movies
+      setKannadaMovies(kannada.slice(0, 12)); // Show top 12 kannada movies
+      setMalayalamMovies(malayalam.slice(0, 12)); // Show top 12 malayalam movies
+      setHindiMovies(hindi.slice(0, 12)); // Show top 12 hindi movies
     };
     fetchMovies();
   }, []);
 
-  useEffect(() => {
-    const fetchGroups = async () => {
-      const token = getValidToken();
-      setGroupsLoading(true);
-      try {
-        const headers: Record<string, string> = {};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
-        if (res.ok) {
-          const data = await res.json();
-          // Sort by memberCount descending
-          const sorted = data.sort((a: GroupResponse, b: GroupResponse) => b.memberCount - a.memberCount);
-          setGroups(sorted.slice(0, 3));
-        }
-      } catch (e) {
-        console.error("Failed to fetch public groups for home", e);
-      } finally {
-        setGroupsLoading(false);
+  const fetchGroups = async () => {
+    const token = getValidToken();
+    setGroupsLoading(true);
+    setGroupsError(null);
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE_URL}/api/groups/public?t=${Date.now()}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        // Sort by memberCount descending
+        const sorted = data.sort((a: GroupResponse, b: GroupResponse) => b.memberCount - a.memberCount);
+        setGroups(sorted.slice(0, 3));
+      } else {
+        setGroupsError("There is an issue from the server side. Please contact support at: rajeshmamilla206@gmail.com");
       }
-    };
+    } catch (e) {
+      console.error("Failed to fetch public groups for home", e);
+      setGroupsError("There is an issue from the server side. Please contact support at: rajeshmamilla206@gmail.com");
+    } finally {
+      setGroupsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchGroups();
   }, []);
 
@@ -105,6 +236,16 @@ export default function Home() {
       return;
     }
     navigate(`/group/${group.id}`);
+  };
+
+  const handleCreateDiscussion = () => {
+    const token = getValidToken();
+    if (!token) {
+      window.dispatchEvent(new Event('open-auth-modal'));
+      return;
+    }
+    setSelectedMovieForGroup(displayMovie);
+    setIsCreateModalOpen(true);
   };
 
   const handleJoinOrRequest = async (group: GroupResponse) => {
@@ -202,18 +343,21 @@ export default function Home() {
               {displayMovie ? (displayMovie.title || displayMovie.name) : 'Loading...'}
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-xl leading-relaxed line-clamp-3">
-              {displayMovie ? displayMovie.overview : 'Join C3 to discuss your favorite Telugu and global movies. Dive deep into Direction, Screenplay, VFX, and Music.'}
+              {displayMovie ? displayMovie.overview : 'Join C3 to discuss your Telugu and global movies. Dive deep into Direction, Screenplay, VFX, and Music.'}
             </p>
             <div className="flex space-x-4">
               <button
-                onClick={() => displayMovie && navigate(`/media/${displayMovie.media_type || 'movie'}/${displayMovie.id}`)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 rounded-md font-medium transition-colors flex items-center space-x-2"
+                onClick={handleCreateDiscussion}
+                className="bg-primary/25 backdrop-blur-md border border-primary/30 text-primary-foreground px-8 py-3 rounded-md font-medium transition-all hover:bg-primary/35 hover:scale-[1.02] border-primary/50 shadow-lg shadow-primary/10 flex items-center space-x-2"
               >
-                <Play className="w-5 h-5 fill-current" />
-                <span>Join the Club</span>
+                <Plus className="w-5 h-5" />
+                <span>Create Discussion</span>
               </button>
-              <button className="bg-secondary hover:bg-secondary/80 text-foreground px-8 py-3 rounded-md font-medium transition-colors">
-                Explore Groups
+              <button 
+                onClick={() => navigate('/movies')}
+                className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-8 py-3 rounded-md font-medium transition-all hover:bg-white/15 hover:scale-[1.02] border-white/40 shadow-lg shadow-white/5"
+              >
+                Explore
               </button>
             </div>
           </div>
@@ -221,48 +365,58 @@ export default function Home() {
       </section>
 
       {/* Trending Global Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold flex items-center space-x-2">
-            <TrendingUp className="text-primary w-6 h-6" />
-            <span>Trending Globally</span>
-          </h2>
-          <button
-            onClick={() => navigate('/explore/trending')}
-            className="text-sm text-primary hover:underline"
-          >
-            View All
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-          {trendingMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} c3Rating={c3Ratings[movie.id]} />
-          ))}
-        </div>
-      </section>
+      <MovieRow 
+        title="Trending Globally" 
+        icon={<TrendingUp className="w-6 h-6 text-primary" />} 
+        movies={trendingMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/trending')} 
+      />
 
       {/* Popular Telugu Section */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold flex items-center space-x-2">
-            <span className="text-2xl">🔥</span>
-            <span>Telugu Cinema</span>
-          </h2>
-          <button
-            onClick={() => navigate('/explore/telugu')}
-            className="text-sm text-primary hover:underline"
-          >
-            View All
-          </button>
-        </div>
+      <MovieRow 
+        title="Telugu Cinema" 
+        emoji="🔥" 
+        movies={teluguMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/telugu')} 
+      />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-          {teluguMovies.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} c3Rating={c3Ratings[movie.id]} />
-          ))}
-        </div>
-      </section>
+      {/* Popular Tamil Section */}
+      <MovieRow 
+        title="Tamil Cinema" 
+        emoji="🎬" 
+        movies={tamilMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/tamil')} 
+      />
+
+      {/* Popular Kannada Section */}
+      <MovieRow 
+        title="Kannada Cinema" 
+        emoji="⭐" 
+        movies={kannadaMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/kannada')} 
+      />
+
+      {/* Popular Malayalam Section */}
+      <MovieRow 
+        title="Malayalam Cinema" 
+        emoji="🎥" 
+        movies={malayalamMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/malayalam')} 
+      />
+
+      {/* Popular Hindi Section */}
+      <MovieRow 
+        title="Hindi Cinema" 
+        emoji="🍿" 
+        movies={hindiMovies} 
+        c3Ratings={c3Ratings} 
+        onMoreClick={() => navigate('/explore/hindi')} 
+      />
 
       {/* Popular Discussions Section */}
       <section className="container mx-auto px-4 py-16 border-t border-border">
@@ -273,9 +427,10 @@ export default function Home() {
           </h2>
           <button
             onClick={() => navigate('/groups')}
-            className="text-sm text-primary hover:underline"
+            className="text-sm text-primary hover:underline flex items-center space-x-1 font-semibold group/more"
           >
-            View All Groups
+            <span>More</span>
+            <span className="transition-transform group-hover/more:translate-x-1 duration-200">→</span>
           </button>
         </div>
 
@@ -284,6 +439,18 @@ export default function Home() {
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-secondary/30 rounded-xl h-44 animate-pulse border border-border" />
             ))}
+          </div>
+        ) : groupsError ? (
+          <div className="bg-secondary/20 border border-dashed border-red-500/20 rounded-xl p-12 text-center max-w-xl mx-auto">
+            <XCircle className="w-12 h-12 text-red-500/60 mx-auto mb-4" />
+            <h3 className="text-lg font-bold mb-2 text-red-400">Server Error</h3>
+            <p className="text-sm text-muted-foreground mb-6">{groupsError}</p>
+            <button
+              onClick={() => fetchGroups()}
+              className="bg-secondary hover:bg-secondary/80 text-foreground border border-border px-6 py-2 rounded-lg font-medium transition-colors"
+            >
+              Retry Connection
+            </button>
           </div>
         ) : groups.length === 0 ? (
           <div className="bg-secondary/20 border border-dashed border-border rounded-xl p-12 text-center max-w-xl mx-auto">
@@ -303,80 +470,96 @@ export default function Home() {
               <div
                 key={group.id}
                 onClick={() => handleCardClick(group)}
-                className="bg-secondary/50 rounded-xl p-6 border border-border hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col justify-between"
+                className="bg-secondary/50 rounded-xl border border-border hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all cursor-pointer group flex flex-col overflow-hidden animate-float-in"
               >
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2 flex justify-between items-center">
-                    <span className="uppercase tracking-wider font-semibold truncate max-w-[150px]" title={group.movieTitle}>
+                {/* Horizontal Movie Image Banner */}
+                <div className="relative h-36 w-full overflow-hidden">
+                  <img
+                    src={getImageUrl(group.moviePoster, 'w500')}
+                    alt={group.movieTitle}
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/20 to-transparent" />
+                  
+                  {/* Overlay tags/badges */}
+                  <div className="absolute top-2 right-2 flex items-center space-x-1.5">
+                    {group.isPrivate && (
+                      <span className="bg-red-500/85 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-[9px] font-bold flex items-center space-x-1">
+                        <Lock className="w-2.5 h-2.5" />
+                        <span>Private</span>
+                      </span>
+                    )}
+                    <span className="bg-black/60 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                      {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div className="absolute bottom-2 left-3 flex items-center space-x-1.5">
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-white/90 bg-black/40 px-2 py-0.5 rounded backdrop-blur-sm truncate max-w-[200px]" title={group.movieTitle}>
                       {group.movieTitle}
                     </span>
-                    <div className="flex items-center space-x-1.5 shrink-0">
-                      {group.isPrivate && (
-                        <span className="bg-red-500/15 text-red-500 border border-red-500/25 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center space-x-1">
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>Private</span>
-                        </span>
-                      )}
-                      <span className="bg-background px-2.5 py-1 rounded-full text-[11px] font-medium">
-                        {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
-                    {group.name}
-                  </h3>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {group.focus && group.focus.split(',').map(f => f.trim()).filter(Boolean).map(f => (
-                      <span key={f} className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                        {f}
-                      </span>
-                    ))}
-                    {group.keywords && group.keywords.split(',').slice(0, 2).map(k => k.trim()).filter(Boolean).map(kw => (
-                      <span key={kw} className="text-xs bg-secondary text-muted-foreground border border-border/55 px-3 py-1 rounded-full">
-                        {kw}
-                      </span>
-                    ))}
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between pt-4 border-t border-border/50 text-xs text-muted-foreground mt-auto">
-                  <span>Created by: <span className="font-semibold text-foreground">
-                    {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
-                  </span></span>
-                  {joiningGroupId === group.id ? (
-                    <span className="text-primary animate-pulse font-medium">Processing...</span>
-                  ) : group.isMember ? (
-                    <span className={`${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} font-medium flex items-center space-x-1`}>
-                      <span>{currentUser && group.createdBy === currentUser ? 'Admin' : 'Joined'}</span>
-                    </span>
-                  ) : group.isPrivate ? (
-                    group.joinRequestStatus === 'PENDING' ? (
-                      <span className="text-yellow-500 font-medium flex items-center space-x-1">
-                        <Clock className="w-3.5 h-3.5 animate-pulse" />
-                        <span>Pending</span>
+
+                {/* Card Body */}
+                <div className="p-5 flex flex-col flex-1 justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors line-clamp-2 leading-tight">
+                      {group.name}
+                    </h3>
+                    <div className="flex flex-wrap gap-1 mb-4">
+                      {group.focus && group.focus.split(',').map(f => f.trim()).filter(Boolean).map(f => (
+                        <span key={f} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium uppercase tracking-wider">
+                          {f}
+                        </span>
+                      ))}
+                      {group.keywords && group.keywords.split(',').slice(0, 2).map(k => k.trim()).filter(Boolean).map(kw => (
+                        <span key={kw} className="text-[10px] bg-secondary text-muted-foreground border border-border/55 px-2 py-0.5 rounded-full">
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-3 border-t border-border/50 text-[11px] text-muted-foreground mt-auto">
+                    <span>Created by: <span className="font-semibold text-foreground">
+                      {currentUser && group.createdBy === currentUser ? 'you' : group.createdBy}
+                    </span></span>
+                    {joiningGroupId === group.id ? (
+                      <span className="text-primary animate-pulse font-medium">Processing...</span>
+                    ) : group.isMember ? (
+                      <span className={`${currentUser && group.createdBy === currentUser ? 'text-primary' : 'text-green-400'} font-medium flex items-center space-x-1`}>
+                        <span>{currentUser && group.createdBy === currentUser ? 'Admin' : 'Joined'}</span>
                       </span>
-                    ) : group.joinRequestStatus === 'DENIED' ? (
-                      <span className="text-red-500 font-medium flex items-center space-x-1">
-                        <XCircle className="w-3.5 h-3.5" />
-                        <span>Denied</span>
-                      </span>
+                    ) : group.isPrivate ? (
+                      group.joinRequestStatus === 'PENDING' ? (
+                        <span className="text-yellow-500 font-medium flex items-center space-x-1">
+                          <Clock className="w-3.5 h-3.5 animate-pulse" />
+                          <span>Pending</span>
+                        </span>
+                      ) : group.joinRequestStatus === 'DENIED' ? (
+                        <span className="text-red-500 font-medium flex items-center space-x-1">
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Denied</span>
+                        </span>
+                      ) : (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleJoinOrRequest(group); }}
+                          className="text-primary font-medium flex items-center space-x-1 hover:underline bg-transparent border-0 cursor-pointer"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Request</span>
+                        </button>
+                      )
                     ) : (
                       <button 
                         onClick={(e) => { e.stopPropagation(); handleJoinOrRequest(group); }}
-                        className="text-primary font-medium flex items-center space-x-1 hover:underline bg-transparent border-0 cursor-pointer"
+                        className="text-primary font-medium hover:underline bg-transparent border-0 cursor-pointer"
                       >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>Request</span>
+                        Join & Chat
                       </button>
-                    )
-                  ) : (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleJoinOrRequest(group); }}
-                      className="text-primary font-medium hover:underline bg-transparent border-0 cursor-pointer"
-                    >
-                      Join & Chat
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -384,6 +567,15 @@ export default function Home() {
         )}
       </section>
 
+      <CreateGroupModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedMovieForGroup(null);
+        }}
+        onSuccess={(groupId) => navigate(`/group/${groupId}`)}
+        initialMovie={selectedMovieForGroup}
+      />
     </div>
   );
 }
