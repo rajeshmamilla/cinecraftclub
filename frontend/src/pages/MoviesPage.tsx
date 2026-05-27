@@ -137,7 +137,7 @@ function HorizontalScroll({ children }: { children: React.ReactNode }) {
       <div 
         ref={ref} 
         onScroll={handleScroll}
-        className={`flex space-x-4 overflow-x-auto pb-4 scrollbar-hide ${!isReady ? 'invisible' : ''}`}
+        className={`flex space-x-4 overflow-x-auto py-4 -my-4 scrollbar-hide ${!isReady ? 'invisible' : ''}`}
       >
         {triplicatedChildren.map((child, idx) => {
           if (React.isValidElement(child)) {

@@ -23,4 +23,5 @@ public class GroupResponse {
     @JsonProperty("isMember")
     private boolean isMember;
     private String joinRequestStatus;
+    private long messageCount;
 }

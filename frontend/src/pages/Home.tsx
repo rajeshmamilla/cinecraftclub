@@ -62,7 +62,7 @@ function MovieRow({ title, emoji, icon, movies, c3Ratings, onMoreClick }: MovieR
   const handleScroll = (dir: 'left' | 'right') => {
     const el = rowRef.current;
     if (!el) return;
-    const step = el.clientWidth * 0.75;
+    const step = el.clientWidth;
     el.scrollBy({
       left: dir === 'left' ? -step : step,
       behavior: 'smooth'
@@ -102,12 +102,12 @@ function MovieRow({ title, emoji, icon, movies, c3Ratings, onMoreClick }: MovieR
         <div
           ref={rowRef}
           onScroll={checkScroll}
-          className="flex space-x-6 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
+          className="flex space-x-6 overflow-x-auto py-4 -my-4 scrollbar-hide snap-x snap-mandatory scroll-smooth -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0"
         >
           {movies.map((movie) => (
             <div
               key={movie.id}
-              className="w-[150px] sm:w-[170px] md:w-[190px] lg:w-[210px] shrink-0 snap-start"
+              className="w-[calc((100%-24px)/2)] sm:w-[calc((100%-48px)/3)] md:w-[calc((100%-72px)/4)] lg:w-[calc((100%-96px)/5)] xl:w-[calc((100%-120px)/6)] shrink-0 snap-start"
             >
               <MovieCard movie={movie} c3Rating={c3Ratings[movie.id]} />
             </div>

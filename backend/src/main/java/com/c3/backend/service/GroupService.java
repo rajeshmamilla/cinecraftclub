@@ -71,6 +71,7 @@ public class GroupService {
                 .memberCount(group.getMembers().size())
                 .isMember(isMember)
                 .joinRequestStatus(joinRequestStatus)
+                .messageCount(messageRepository.countByGroupId(group.getId()))
                 .build();
     }
 
@@ -380,6 +381,7 @@ public class GroupService {
                 .memberCount(group.getMembers().size())
                 .isMember(isMember)
                 .joinRequestStatus(joinRequestStatus)
+                .messageCount(messageRepository.countByGroupId(group.getId()))
                 .trendingKeywords(kwResponses)
                 .members(memberResponses)
                 .build();

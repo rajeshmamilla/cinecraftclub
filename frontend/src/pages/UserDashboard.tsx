@@ -29,6 +29,16 @@ export default function UserDashboard() {
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [isUsernameModalOpen, setIsUsernameModalOpen] = useState(false);
 
+  const getUnreadCount = (group: any) => {
+    const readCountStr = localStorage.getItem(`readCount_${group.id}`);
+    if (readCountStr === null) {
+      localStorage.setItem(`readCount_${group.id}`, group.messageCount.toString());
+      return 0;
+    }
+    const readCount = parseInt(readCountStr, 10);
+    return Math.max(0, group.messageCount - readCount);
+  };
+
   useEffect(() => {
     // Extract token from URL if redirected from OAuth2
     const queryParams = new URLSearchParams(location.search);
@@ -120,6 +130,30 @@ export default function UserDashboard() {
     };
     
     fetchData();
+
+    // Poll groups and requests every 5 seconds
+    const interval = setInterval(async () => {
+      try {
+        const [grRes, reqRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/groups`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/groups/requests?status=PENDING`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        if (grRes.ok) setGroups(await grRes.json());
+        if (reqRes.ok) setJoinRequests(await reqRes.json());
+      } catch (e) {
+        console.error("Failed to poll dashboard updates", e);
+      }
+    }, 5000);
+
+    const handleStorageChange = () => {
+      fetchData();
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [token]);
 
   const handleToggleWatched = async (movieId: number) => {
@@ -374,9 +408,19 @@ export default function UserDashboard() {
                           <p className="text-xs text-primary font-medium">{group.focus}</p>
                           <p className="text-[10px] text-muted-foreground">by {group.createdBy}</p>
                         </div>
-                        <div className="flex items-center space-x-2 text-[10px] text-muted-foreground">
-                          <MessageSquare className="w-3 h-3" />
-                          <span>Open Chat</span>
+                        <div className="flex items-center justify-between mt-1">
+                          <div className="flex items-center space-x-2 text-[10px] text-muted-foreground">
+                            <MessageSquare className="w-3 h-3 text-primary" />
+                            <span>Open Chat</span>
+                          </div>
+                          {(() => {
+                            const unread = getUnreadCount(group);
+                            return unread > 0 ? (
+                              <span className="bg-primary/20 text-primary border border-primary/30 font-bold text-[9px] px-2 py-0.5 rounded-full animate-in zoom-in duration-200 uppercase tracking-wider">
+                                {unread} unread
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </div>
