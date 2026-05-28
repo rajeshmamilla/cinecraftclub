@@ -376,7 +376,6 @@ export default function Home() {
       {/* Popular Telugu Section */}
       <MovieRow 
         title="Telugu Cinema" 
-        emoji="🔥" 
         movies={teluguMovies} 
         c3Ratings={c3Ratings} 
         onMoreClick={() => navigate('/explore/telugu')} 
@@ -385,7 +384,6 @@ export default function Home() {
       {/* Popular Tamil Section */}
       <MovieRow 
         title="Tamil Cinema" 
-        emoji="🎬" 
         movies={tamilMovies} 
         c3Ratings={c3Ratings} 
         onMoreClick={() => navigate('/explore/tamil')} 
@@ -394,7 +392,6 @@ export default function Home() {
       {/* Popular Kannada Section */}
       <MovieRow 
         title="Kannada Cinema" 
-        emoji="⭐" 
         movies={kannadaMovies} 
         c3Ratings={c3Ratings} 
         onMoreClick={() => navigate('/explore/kannada')} 
@@ -403,7 +400,6 @@ export default function Home() {
       {/* Popular Malayalam Section */}
       <MovieRow 
         title="Malayalam Cinema" 
-        emoji="🎥" 
         movies={malayalamMovies} 
         c3Ratings={c3Ratings} 
         onMoreClick={() => navigate('/explore/malayalam')} 
@@ -412,7 +408,6 @@ export default function Home() {
       {/* Popular Hindi Section */}
       <MovieRow 
         title="Hindi Cinema" 
-        emoji="🍿" 
         movies={hindiMovies} 
         c3Ratings={c3Ratings} 
         onMoreClick={() => navigate('/explore/hindi')} 
