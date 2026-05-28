@@ -6,8 +6,8 @@ CineCraftClub (C3) is a modern, production-ready, full-stack collaborative platf
 
 ## 🔗 Live Deployments
 
-* **Live Demo (Frontend)**: [https://cinecraftclub.vercel.app](https://c3cinema.vercel.app) 
-* **Production API (Backend)**: [https://cinecraftclub.onrender.com](https://c3.onrender.com) 
+* **Live Demo (Frontend)**: [https://c3cinema.vercel.app](https://c3cinema.vercel.app) 
+* **Production API (Backend)**: [https://c3.onrender.com](https://c3.onrender.com) 
 
 ---
 
