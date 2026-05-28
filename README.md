@@ -6,8 +6,8 @@ CineCraftClub (C3) is a modern, production-ready, full-stack collaborative platf
 
 ## 🔗 Live Deployments
 
-* **Live Demo (Frontend)**: [https://cinecraftclub.vercel.app](https://cinecraftclub.vercel.app) *(or add your link here)*
-* **Production API (Backend)**: [https://cinecraftclub.onrender.com](https://cinecraftclub.onrender.com) *(or add your link here)*
+* **Live Demo (Frontend)**: [https://cinecraftclub.vercel.app](https://cinecraftclub.vercel.app) 
+* **Production API (Backend)**: [https://cinecraftclub.onrender.com](https://cinecraftclub.onrender.com) 
 
 ---
 
@@ -140,3 +140,23 @@ C3/
    npm run dev
    ```
    *The frontend will run on [http://localhost:5173](http://localhost:5173).*
+
+
+### Screen SHOTS Of deployed app
+<img width="1919" height="966" alt="image" src="https://github.com/user-attachments/assets/5a105088-21ab-4f7d-bc05-35c62fc2e39f" />
+<img width="1919" height="968" alt="image" src="https://github.com/user-attachments/assets/139fcd61-c36c-4c7b-9f9c-ab550b3d7d80" />
+<img width="1919" height="959" alt="image" src="https://github.com/user-attachments/assets/68f9db4d-b914-4099-9ba4-fc12d87cf92e" />
+<img width="1918" height="956" alt="image" src="https://github.com/user-attachments/assets/4899176f-3ab9-4687-88a5-e1e29f15db87" />
+<img width="1919" height="975" alt="image" src="https://github.com/user-attachments/assets/586544cd-6b8e-4f82-9e64-17af2b92d5b3" />
+<img width="1919" height="964" alt="image" src="https://github.com/user-attachments/assets/f17e2791-421c-44c2-a5ac-a292a5264e4d" />
+<img width="1919" height="973" alt="image" src="https://github.com/user-attachments/assets/182ebcad-5921-4b98-bbb0-4bfcac6e292e" />
+<img width="1919" height="959" alt="image" src="https://github.com/user-attachments/assets/a22ad275-70e8-44db-bbf2-f72510adc861" />
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/eb419b87-8a6b-4c4c-b1a3-5f5820a47a69" />
+<img width="1919" height="960" alt="image" src="https://github.com/user-attachments/assets/f9a2eb15-fadc-4bc3-805b-60daec4effb3" />
+<img width="1919" height="879" alt="image" src="https://github.com/user-attachments/assets/0e23b673-6481-4524-b255-61df862ea390" />
+<img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/d0a26377-dc1f-41e1-a300-9e8525e1307f" />
+<img width="1919" height="966" alt="image" src="https://github.com/user-attachments/assets/a797eb1a-27e1-4299-a9dd-cd50af106dc7" />
+<img width="1919" height="958" alt="image" src="https://github.com/user-attachments/assets/48de8442-0914-4d9e-b1e8-1af0c094e552" />
+
+
+
