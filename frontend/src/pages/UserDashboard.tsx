@@ -50,6 +50,7 @@ export default function UserDashboard() {
     if (urlToken) {
       localStorage.setItem('jwtToken', urlToken);
       setToken(urlToken);
+      window.dispatchEvent(new Event('storage'));
       // Clean up URL
       window.history.replaceState({}, document.title, "/dashboard");
 
