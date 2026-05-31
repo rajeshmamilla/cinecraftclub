@@ -8,6 +8,8 @@ import CreateGroupModal from '../components/groups/CreateGroupModal';
 import VerificationModal from '../components/profile/VerificationModal';
 import ChangeUsernameModal from '../components/profile/ChangeUsernameModal';
 import { getImageUrl } from '../services/tmdb';
+import MovieStackLoader from '../components/ui/MovieStackLoader';
+
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -21,6 +23,7 @@ export default function UserDashboard() {
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
   const [ratings, setRatings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Getting your account details...");
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
 
   // Email and Username states
@@ -103,6 +106,8 @@ export default function UserDashboard() {
   useEffect(() => {
     if (!token) return;
     
+    let active = true;
+
     const fetchData = async () => {
       try {
         const [meRes, wlRes, grRes, reqRes, ratRes] = await Promise.all([
@@ -113,20 +118,46 @@ export default function UserDashboard() {
           fetch(`${API_BASE_URL}/api/ratings`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
-        if (meRes.ok) {
-          const meData = await meRes.json();
+        // Handle expired token or session issues (401)
+        if (meRes.status === 401 || wlRes.status === 401) {
+          if (active) handleLogout();
+          return;
+        }
+
+        // Throw error if server responds with bad status (e.g. 500 or 503) so we retry
+        if (!meRes.ok || !wlRes.ok || !grRes.ok || !reqRes.ok || !ratRes.ok) {
+          throw new Error("Server responded with error status");
+        }
+
+        const meData = await meRes.json();
+        const wlData = await wlRes.json();
+        const grData = await grRes.json();
+        const reqData = await reqRes.json();
+        const ratData = await ratRes.json();
+
+        if (active) {
           setUsername(meData.username);
           setEmail(meData.email || "");
           setEmailVerified(meData.emailVerified || false);
+          
+          setWatchlist(wlData);
+          const ids = wlData.map((item: any) => item.movieId);
+          localStorage.setItem('watchlistIds', JSON.stringify(ids));
+          
+          setGroups(grData);
+          setJoinRequests(reqData);
+          setRatings(ratData);
+
+          setLoadingMessage("Getting your account details...");
+          setIsLoading(false);
         }
-        if (wlRes.ok) setWatchlist(await wlRes.json());
-        if (grRes.ok) setGroups(await grRes.json());
-        if (reqRes.ok) setJoinRequests(await reqRes.json());
-        if (ratRes.ok) setRatings(await ratRes.json());
       } catch (err) {
-        console.error("Failed to fetch dashboard data", err);
-      } finally {
-        setIsLoading(false);
+        console.warn("Failed to connect or fetch dashboard data, retrying...", err);
+        if (active) {
+          setLoadingMessage("Server connection lost. Waking up server, please wait...");
+          // Retry in 4 seconds
+          setTimeout(fetchData, 4000);
+        }
       }
     };
     
@@ -152,6 +183,7 @@ export default function UserDashboard() {
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
+      active = false;
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -222,6 +254,7 @@ export default function UserDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('jwtToken');
+    localStorage.removeItem('watchlistIds');
     window.location.href = '/';
   };
 
@@ -332,7 +365,13 @@ export default function UserDashboard() {
 
         {/* Main Content Area */}
         <div className="flex-1 bg-secondary/30 border border-border p-8 rounded-2xl min-h-[500px]">
-          {activeTab === 'watchlist' && (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              <MovieStackLoader message={loadingMessage} />
+            </div>
+          ) : (
+            <>
+              {activeTab === 'watchlist' && (
             <div className={`h-full w-full ${watchlist.length === 0 ? 'flex flex-col items-center justify-center text-center' : 'flex flex-col'}`}>
               {isLoading ? (
                 <div className="animate-pulse flex items-center justify-center h-full">Loading...</div>
@@ -611,6 +650,8 @@ export default function UserDashboard() {
               </div>
             </div>
           )}
+          </>
+         )}
         </div>
       </div>
 

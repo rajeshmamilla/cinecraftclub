@@ -62,6 +62,32 @@ export default function Navbar() {
   useEffect(() => {
     const token = getValidToken();
     if (!token) {
+      localStorage.removeItem('watchlistIds');
+      return;
+    }
+
+    const fetchWatchlistIds = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const wlData = await res.json();
+          const ids = wlData.map((item: any) => item.movieId);
+          localStorage.setItem('watchlistIds', JSON.stringify(ids));
+          window.dispatchEvent(new Event('watchlist-updated'));
+        }
+      } catch (e) {
+        console.error("Failed to pre-fetch watchlist IDs", e);
+      }
+    };
+
+    fetchWatchlistIds();
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    const token = getValidToken();
+    if (!token) {
       setNotificationCount(0);
       return;
     }
