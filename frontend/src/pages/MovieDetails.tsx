@@ -209,16 +209,39 @@ export default function MovieDetails() {
   // Fetch watchlist status
   useEffect(() => {
     if (!id || !token) { setWatchlistLoading(false); return; }
-    const check = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) setInWatchlist(await res.json());
-      } catch (e) { console.error(e); }
-      finally { setWatchlistLoading(false); }
+    
+    const check = () => {
+      const cached = localStorage.getItem('watchlistIds');
+      if (cached) {
+        const ids = JSON.parse(cached);
+        setInWatchlist(ids.includes(Number(id)));
+        setWatchlistLoading(false);
+      } else {
+        const checkApi = async () => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) setInWatchlist(await res.json());
+          } catch (e) { console.error(e); }
+          finally { setWatchlistLoading(false); }
+        };
+        checkApi();
+      }
     };
+
     check();
+
+    const handleUpdate = () => {
+      const updatedCached = localStorage.getItem('watchlistIds');
+      if (updatedCached) {
+        const ids = JSON.parse(updatedCached);
+        setInWatchlist(ids.includes(Number(id)));
+      }
+    };
+
+    window.addEventListener('watchlist-updated', handleUpdate);
+    return () => window.removeEventListener('watchlist-updated', handleUpdate);
   }, [id, token]);
 
   // Fetch user's rating for this movie
@@ -245,17 +268,38 @@ export default function MovieDetails() {
   const toggleWatchlist = async () => {
     if (!token) { window.dispatchEvent(new Event('open-auth-modal')); return; }
     const prev = inWatchlist;
-    setInWatchlist(!prev);
-    const title = movie?.title || movie?.name || 'Movie';
+    const newState = !prev;
+    setInWatchlist(newState);
+    const titleText = movie?.title || movie?.name || 'Movie';
+
+    const cached = localStorage.getItem('watchlistIds');
+    const originalIds = cached ? JSON.parse(cached) : [];
+    let updatedIds = [...originalIds];
+
+    if (prev) {
+      updatedIds = updatedIds.filter((currId: number) => currId !== Number(id));
+      localStorage.setItem('watchlistIds', JSON.stringify(updatedIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.error('Removed from Watchlist', { description: titleText });
+    } else {
+      if (!updatedIds.includes(Number(id))) {
+        updatedIds.push(Number(id));
+      }
+      localStorage.setItem('watchlistIds', JSON.stringify(updatedIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.success('Added to Watchlist', { description: titleText });
+    }
+
+    // Backend sync in background
     try {
       if (prev) {
-        await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        toast.error('Removed from Watchlist', { description: title });
+        if (!res.ok) throw new Error("Delete failed");
       } else {
-        await fetch(`${API_BASE_URL}/api/watchlist`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
           body: JSON.stringify({
@@ -268,9 +312,18 @@ export default function MovieDetails() {
             releaseDate: movie?.release_date || movie?.first_air_date
           })
         });
-        toast.success('Added to Watchlist', { description: title });
+        if (!res.ok) throw new Error("Add failed");
       }
-    } catch (e) { setInWatchlist(prev); toast.error('Something went wrong.'); }
+    } catch (e) {
+      // Revert on failure
+      setInWatchlist(prev);
+      localStorage.setItem('watchlistIds', JSON.stringify(originalIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.error('Failed to sync with server.', {
+        description: `Could not update watchlist for ${titleText}`
+      });
+      console.error(e);
+    }
   };
 
   const handleJoinGroup = async (groupId: string) => {

@@ -44,27 +44,44 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
   }, [movie.id, c3Rating]);
 
   useEffect(() => {
-    const checkWatchlist = async () => {
+    const checkWatchlist = () => {
       const token = getValidToken();
       if (!token) {
+        setInWatchlist(false);
         setIsLoading(false);
         return;
       }
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${movie.id}?t=${Date.now()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const isSaved = await res.json();
-          setInWatchlist(isSaved);
-        }
-      } catch (e) {
-        // Silently catch watchlist check errors
-      } finally {
+
+      // Check from local cache first to avoid multiple API requests
+      const cached = localStorage.getItem('watchlistIds');
+      if (cached) {
+        const ids = JSON.parse(cached);
+        setInWatchlist(ids.includes(movie.id));
         setIsLoading(false);
+      } else {
+        // Fallback to API check only if cache is not populated yet
+        const fetchCheck = async () => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/watchlist/check/${movie.id}?t=${Date.now()}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+              const isSaved = await res.json();
+              setInWatchlist(isSaved);
+            }
+          } catch (e) {
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        fetchCheck();
       }
     };
+
     checkWatchlist();
+
+    window.addEventListener('watchlist-updated', checkWatchlist);
+    return () => window.removeEventListener('watchlist-updated', checkWatchlist);
   }, [movie.id]);
 
   const toggleWatchlist = async (e: React.MouseEvent) => {
@@ -81,21 +98,43 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
       return;
     }
 
-    // Optimistic UI update
+    // Optimistic UI and local cache update
     const previousState = inWatchlist;
-    setInWatchlist(!previousState);
+    const newState = !previousState;
+    setInWatchlist(newState);
 
+    const cached = localStorage.getItem('watchlistIds');
+    const originalIds = cached ? JSON.parse(cached) : [];
+    let updatedIds = [...originalIds];
+
+    if (previousState) {
+      updatedIds = updatedIds.filter((id: number) => id !== movie.id);
+      localStorage.setItem('watchlistIds', JSON.stringify(updatedIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.error(`Removed from Watchlist`, {
+        description: movie.title || movie.name,
+      });
+    } else {
+      if (!updatedIds.includes(movie.id)) {
+        updatedIds.push(movie.id);
+      }
+      localStorage.setItem('watchlistIds', JSON.stringify(updatedIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.success(`Added to Watchlist`, {
+        description: movie.title || movie.name,
+      });
+    }
+
+    // Synchronize on backend in background
     try {
       if (previousState) {
-        await fetch(`${API_BASE_URL}/api/watchlist/${movie.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist/${movie.id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        toast.error(`Removed from Watchlist`, {
-          description: movie.title || movie.name,
-        });
+        if (!res.ok) throw new Error("Delete failed");
       } else {
-        await fetch(`${API_BASE_URL}/api/watchlist`, {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -111,14 +150,16 @@ export default function MovieCard({ movie, c3Rating }: MovieCardProps) {
             releaseDate: movie.release_date || movie.first_air_date
           })
         });
-        toast.success(`Added to Watchlist`, {
-          description: movie.title || movie.name,
-        });
+        if (!res.ok) throw new Error("Add failed");
       }
     } catch (e) {
       // Revert on failure
       setInWatchlist(previousState);
-      toast.error('Something went wrong. Please try again.');
+      localStorage.setItem('watchlistIds', JSON.stringify(originalIds));
+      window.dispatchEvent(new Event('watchlist-updated'));
+      toast.error('Failed to sync with server.', {
+        description: `Could not update watchlist for ${movie.title || movie.name}`
+      });
       console.error("Failed to update watchlist", e);
     }
   };

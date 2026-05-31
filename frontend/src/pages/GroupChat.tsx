@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import MovieInfoPanel from '@/components/groups/MovieInfoPanel';
 import TrendingKeywords from '@/components/groups/TrendingKeywords';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
+import MovieStackLoader from '../components/ui/MovieStackLoader';
+
 
 interface Message { 
   id: number; 
@@ -70,6 +72,7 @@ export default function GroupChat() {
   const [newMessage, setNewMessage] = useState('');
   const [currentUser, setCurrentUser] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState("Loading discussion...");
   const [reactions, setReactions] = useState<Reactions>({});
   const [hoveredMsg, setHoveredMsg] = useState<number | null>(null);
   const [movieInfo, setMovieInfo] = useState<any>(null);
@@ -102,22 +105,44 @@ export default function GroupChat() {
       .then(r => r.ok ? r.json() : []).then(setUserGroups).catch(console.error);
   }, [id]);
 
-  // Fetch group + messages, poll every 3s
   useEffect(() => {
     if (!token) return;
+    let active = true;
+
     const load = async () => {
       try {
         const [gRes, mRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/groups/${id}/details`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE_URL}/api/groups/${id}/messages`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        if (gRes.ok) {
-          const groupData = await gRes.json();
+
+        if (gRes.status === 401 || mRes.status === 401) {
+          localStorage.removeItem('jwtToken');
+          navigate('/');
+          return;
+        }
+
+        // If the group doesn't exist (404), stop loading and let it render "Group not found"
+        if (gRes.status === 404) {
+          if (active) setIsLoading(false);
+          return;
+        }
+
+        if (!gRes.ok || !mRes.ok) {
+          throw new Error("Server responded with error status");
+        }
+
+        const groupData = await gRes.json();
+        const msgs = await mRes.json();
+
+        if (active) {
           setGroup(groupData);
+          setMessages(msgs);
           
           if (groupData.movieId) {
             import('../services/tmdb').then(({ getMediaDetails }) => {
               getMediaDetails(groupData.movieId.toString(), 'movie').then(data => {
+                if (!active) return;
                 if (data) {
                   setMovieInfo({
                     id: data.id,
@@ -134,6 +159,7 @@ export default function GroupChat() {
                   });
                 } else {
                   getMediaDetails(groupData.movieId.toString(), 'tv').then(tvData => {
+                    if (!active) return;
                     if (tvData) {
                       setMovieInfo({
                         id: tvData.id,
@@ -154,10 +180,6 @@ export default function GroupChat() {
               });
             });
           }
-        }
-        if (mRes.ok) {
-          const msgs = await mRes.json();
-          setMessages(msgs);
 
           // Populate reactions state from backend messages
           const reactionMap: Reactions = {};
@@ -178,12 +200,25 @@ export default function GroupChat() {
           // Mark all messages as read for this group in local storage
           localStorage.setItem(`readCount_${id}`, msgs.length.toString());
           window.dispatchEvent(new Event('storage'));
+
+          setLoadingMessage("Loading discussion...");
+          setIsLoading(false);
         }
-      } catch {} finally { setIsLoading(false); }
+      } catch (err) {
+        console.warn("Failed to load group details, retrying...", err);
+        if (active) {
+          setLoadingMessage("Server connection lost. Waking up server, please wait...");
+        }
+      }
     };
+
     load();
     const iv = setInterval(load, 3000);
-    return () => clearInterval(iv);
+    
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
   }, [id]);
 
   // Auto-scroll to bottom
@@ -355,7 +390,7 @@ export default function GroupChat() {
     }
   };
 
-  if (isLoading) return <div className="h-screen flex items-center justify-center text-primary text-xl animate-pulse">Loading...</div>;
+  if (isLoading) return <div className="min-h-screen w-full flex items-center justify-center bg-background"><MovieStackLoader message={loadingMessage} /></div>;
   if (!group) return <div className="p-20 text-center">Group not found</div>;
 
   return (
